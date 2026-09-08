@@ -1,10 +1,10 @@
 # RECON
 
-**AI Agent 委托对账协议** — Mandate Reconciliation for AI Agents
+**Mandate Reconciliation for AI Agents**
 
-> 所有人都在给 agent 上锁，我们验证锁真的锁上了。
-> 自动核对 agent「声称做了什么 / 实际做了什么 / 缰绳允许做什么」——对不上，当场标红。
+> Everyone is putting leashes on agents. We verify the leash actually holds.
+> RECON automatically reconciles **what the agent claimed to do**, **what it actually did**, and **what its mandate allowed** — any mismatch gets flagged, instantly.
 
-ETHOnline 2026 · 申报 bounty：Hedera · The Graph · Bazantic
+**ETHOnline 2026** · Bounties: Hedera · The Graph · Bazantic
 
-🚧 开发中 — 从零开始（From Scratch），完整提交历史即开发过程。
+🚧 Work in progress — built from scratch; the full commit history *is* the development process.

@@ -36,13 +36,21 @@ contract PolicyVault is Ownable, ReentrancyGuard {
     error InvalidMandate();
     error InvalidRecipient();
     error InvalidRoleConfiguration();
+    error InvalidSlashAmount();
     error InvalidStatus(Status current);
+    error NativeTransferFailed();
     error UnauthorizedAgent(address caller);
+    error UnauthorizedAgentOperator(address caller);
+    error UnauthorizedVerifier(address caller);
 
     event ActionExecuted(bytes32 indexed evidenceId, address indexed recipient, uint256 amount);
     event ActionRejected(bytes32 indexed evidenceId, RejectReason reason);
+    event Closed();
     event Frozen(bytes32 indexed reasonHash);
     event PrincipalFunded(address indexed funder, uint256 amount);
+    event PrincipalWithdrawn(address indexed recipient, uint256 amount);
+    event Slashed(bytes32 indexed evidenceHash, uint256 amount, address indexed beneficiary);
+    event StakeDeposited(address indexed operator, uint256 amount);
 
     address public immutable agent;
     address public immutable agentOperator;
@@ -51,12 +59,23 @@ contract PolicyVault is Ownable, ReentrancyGuard {
     Mandate public mandate;
     Status public status;
     uint256 public principalBalance;
+    uint256 public stakeBalance;
     uint256 public spent;
 
     mapping(address recipient => bool allowed) public isRecipientAllowed;
 
     modifier onlyAgent() {
         if (msg.sender != agent) revert UnauthorizedAgent(msg.sender);
+        _;
+    }
+
+    modifier onlyAgentOperator() {
+        if (msg.sender != agentOperator) revert UnauthorizedAgentOperator(msg.sender);
+        _;
+    }
+
+    modifier onlyVerifier() {
+        if (msg.sender != verifier) revert UnauthorizedVerifier(msg.sender);
         _;
     }
 
@@ -96,6 +115,14 @@ contract PolicyVault is Ownable, ReentrancyGuard {
         emit PrincipalFunded(msg.sender, msg.value);
     }
 
+    function depositStake() external payable onlyAgentOperator {
+        if (status == Status.Closed) revert InvalidStatus(status);
+        if (msg.value == 0) revert InvalidSlashAmount();
+
+        stakeBalance += msg.value;
+        emit StakeDeposited(msg.sender, msg.value);
+    }
+
     function execute(Action calldata action) external onlyAgent nonReentrant returns (bool executed) {
         if (action.amount == 0) return _reject(action.evidenceId, RejectReason.InvalidAmount);
         if (status != Status.Active) return _reject(action.evidenceId, RejectReason.NotActive);
@@ -127,6 +154,40 @@ contract PolicyVault is Ownable, ReentrancyGuard {
         if (status != Status.Active) revert InvalidStatus(status);
         status = Status.Frozen;
         emit Frozen(reasonHash);
+    }
+
+    function slash(uint256 amount, bytes32 evidenceHash) external onlyVerifier nonReentrant {
+        if (amount == 0 || amount > stakeBalance) revert InvalidSlashAmount();
+
+        stakeBalance -= amount;
+        (bool success,) = slashBeneficiary.call{value: amount}("");
+        if (!success) {
+            stakeBalance += amount;
+            revert NativeTransferFailed();
+        }
+
+        emit Slashed(evidenceHash, amount, slashBeneficiary);
+    }
+
+    function close() external onlyOwner {
+        if (status == Status.Closed) revert InvalidStatus(status);
+        status = Status.Closed;
+        emit Closed();
+    }
+
+    function withdrawAfterClose(address payable recipient) external onlyOwner nonReentrant {
+        if (status != Status.Closed) revert InvalidStatus(status);
+        if (recipient == address(0)) revert InvalidRecipient();
+
+        uint256 amount = principalBalance;
+        principalBalance = 0;
+        (bool success,) = recipient.call{value: amount}("");
+        if (!success) {
+            principalBalance = amount;
+            revert NativeTransferFailed();
+        }
+
+        emit PrincipalWithdrawn(recipient, amount);
     }
 
     function _reject(bytes32 evidenceId, RejectReason reason) private returns (bool) {

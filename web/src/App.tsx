@@ -19,11 +19,6 @@ function EvidenceRow({ label, value }: EvidenceRowProps) {
 export function App() {
   const [mode, setMode] = useState<DemoMode>('normal');
   const snapshot = createDemoSnapshot(mode);
-  const finding = snapshot.report.findings[0];
-
-  if (finding === undefined) {
-    throw new Error('Demo snapshot must include the R1 finding');
-  }
 
   return (
     <main className="shell">
@@ -93,12 +88,16 @@ export function App() {
           <p className="section-label">Verification result</p>
           <h2>{snapshot.report.status}</h2>
         </div>
-        <div className="finding">
-          <code>{finding.rule}</code>
-          <div>
-            <strong>{finding.reasonCode}</strong>
-            <p>{finding.message}</p>
-          </div>
+        <div className="findings">
+          {snapshot.report.findings.map((finding) => (
+            <div className="finding" key={`${finding.rule}:${finding.reasonCode}`}>
+              <code>{finding.rule}</code>
+              <div>
+                <strong>{finding.reasonCode}</strong>
+                <p>{finding.message}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </main>

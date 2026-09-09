@@ -213,6 +213,12 @@ h2 {
   align-items: start;
 }
 
+.finding + .finding {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #d6dcda;
+}
+
 .finding code {
   display: grid;
   width: 42px;

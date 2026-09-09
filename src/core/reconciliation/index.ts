@@ -1,0 +1,1 @@
+export { aggregateVerificationStatus } from './status';

@@ -15,6 +15,7 @@
     "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
+    "probe:graph": "tsx scripts/probe-graph.ts",
     "probe:hedera": "tsx scripts/probe-hedera.ts",
     "web:build": "vite build",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile && npm run web:build"

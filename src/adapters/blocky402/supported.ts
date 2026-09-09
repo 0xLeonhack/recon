@@ -9,7 +9,7 @@ const SupportedResponseSchema = z.object({
       scheme: z.string(),
       network: z.string(),
       x402Version: z.number().int(),
-      extra: z.object({ feePayer: hederaAccountId }).optional(),
+      extra: z.object({ feePayer: z.string().optional() }).passthrough().optional(),
     }),
   ),
   signers: z.record(z.string(), z.array(z.string())).optional(),

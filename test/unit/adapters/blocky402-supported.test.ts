@@ -25,6 +25,37 @@ describe('discoverHederaX402Support', () => {
     });
   });
 
+  it('accepts network-specific extra metadata in the live response shape', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        kinds: [
+          {
+            scheme: 'exact',
+            network: 'eip155:80002',
+            x402Version: 2,
+            extra: { assetTransferMethod: 'permit2' },
+          },
+          {
+            scheme: 'exact',
+            network: 'solana:devnet',
+            x402Version: 2,
+            extra: { feePayer: 'SolanaFeePayerBase58' },
+          },
+          {
+            scheme: 'exact',
+            network: 'hedera:testnet',
+            x402Version: 2,
+            extra: { feePayer: '0.0.7162784' },
+          },
+        ],
+      }),
+    );
+
+    await expect(discoverHederaX402Support(undefined, fetchImpl)).resolves.toMatchObject({
+      scheme: 'exact',
+    });
+  });
+
   it('rejects insecure facilitator URLs', async () => {
     await expect(discoverHederaX402Support('http://facilitator.example')).rejects.toEqual(
       new BlockySupportError('INVALID_RESPONSE'),

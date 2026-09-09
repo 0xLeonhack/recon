@@ -13,16 +13,20 @@
     "typecheck": "tsc -b",
     "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "test:watch": "vitest --config vitest.config.ts",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+    "contracts:compile": "hardhat compile",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
     "@types/node": "^24.13.3",
     "eslint": "^10.10.0",
     "globals": "^17.12.0",
+    "hardhat": "^3.16.0",
     "prettier": "^3.9.6",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.0",
+    "viem": "^2.56.3",
     "vitest": "^5.0.0"
   }
 }

@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "files": []
+  "files": ["hardhat.config.ts"]
 }

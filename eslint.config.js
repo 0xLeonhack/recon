@@ -8,7 +8,7 @@ export default defineConfig(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['scripts/**/*.ts', 'src/**/*.ts', 'test/**/*.ts'],
+    files: ['hardhat.config.ts', 'scripts/**/*.ts', 'src/**/*.ts', 'test/**/*.ts'],
     languageOptions: {
       globals: globals.node,
     },

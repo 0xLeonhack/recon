@@ -23,7 +23,7 @@
 
 | 阶段 | 目标 | 当前状态 | 完成证据 |
 |---|---|---|---|
-| S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成，Gate 0 spike 待执行 |
+| S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成；Hedera/Graph 代码就绪，实网 Gate 待凭证 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 未开始 | - |
 | S2 | PolicyVault 与共享 Core | 未开始 | - |
 | S3 | 外部适配器与正常 Agent 闭环 | 未开始 | - |
@@ -137,6 +137,8 @@ React 三栏面板
 
 失败降级：当天无法稳定完成 HTS 合约转账，则 PolicyVault 改用单资产 HBAR，并同步删除“已完成 HTS 转账”的对外表述。
 
+状态：进行中。`1368f66` 已实测 testnet chain ID 296 和区块读取；`60fd40a`、`6483a05` 已完成 HTS 探针编译、owner 与参数边界测试。真实部署、association 和 transfer 仍需 testnet ECDSA 私钥与 HTS token。
+
 ### S0.3 The Graph 重放 spike
 
 实现最小查询与重放脚本，验证：
@@ -150,6 +152,8 @@ React 三栏面板
 交付证据：一条命令输出全部固定参数、hash 和 `VERIFIED`。
 
 失败降级：更换保留历史状态的 subgraph；在可稳定重放前，不实现依赖该查询的 Agent 决策。
+
+状态：进行中。`3e65336`、`da84c56`、`482d132` 已完成 deployment-pinned 配置、双重重放与脱敏 CLI，22 个单元测试通过。真实查询仍需 `GRAPH_API_KEY`、deployment ID 和 final block number。
 
 ### S0.4 x402 / Blocky402 / Bazantic spike
 

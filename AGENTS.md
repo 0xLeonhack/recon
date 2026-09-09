@@ -43,6 +43,9 @@ short; put durable detail in executable checks or the linked documents.
 - Install: `npm ci`
 - Full local check: `npm run check`
 - Contract compile: `npm run contracts:compile`
+- Contract tests: `npm run test:contracts`
+- Hedera RPC probe: `npm run probe:hedera`
+- The Graph replay probe: `npm run probe:graph`
 - Web build: `npm run web:build`
 - Web development: `npm run dev`
 

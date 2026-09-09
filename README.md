@@ -19,6 +19,14 @@ npm run check
 npm run dev
 ```
 
+Focused verification commands:
+
+```bash
+npm run test:contracts
+npm run probe:hedera
+npm run probe:graph
+```
+
 The development server prints its local URL. Copy `.env.example` to `.env` only when running an
 integration that needs credentials. Never commit `.env`.
 

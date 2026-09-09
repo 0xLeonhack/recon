@@ -1,2 +1,6 @@
-# 本地资料，不提交到 GitHub
-docs/
+# 本地调研资料不提交到 GitHub；权威协作文档除外。
+docs/*
+!docs/prd.md
+!docs/ROADMAP.md
+!docs/project-brief.md
+!docs/features-flow-highlights.md

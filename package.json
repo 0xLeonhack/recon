@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b",
     "test": "vitest run --config vitest.config.ts --passWithNoTests",
+    "test:contracts": "hardhat test nodejs test/contract/HtsTransferProbe.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
     "probe:graph": "tsx scripts/probe-graph.ts",

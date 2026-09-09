@@ -4,3 +4,20 @@ docs/*
 !docs/ROADMAP.md
 !docs/project-brief.md
 !docs/features-flow-highlights.md
+
+# Dependencies and local environment
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Build and test output
+artifacts/
+cache/
+coverage/
+dist/
+*.tsbuildinfo
+
+# Local tooling and operating-system files
+.DS_Store
+.vite/

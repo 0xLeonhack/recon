@@ -3,6 +3,12 @@ import { configVariable, defineConfig } from 'hardhat/config';
 
 export default defineConfig({
   plugins: [hardhatToolboxViem],
+  paths: {
+    tests: {
+      nodejs: './test/contract',
+      solidity: './test/contract',
+    },
+  },
   solidity: {
     version: '0.8.34',
     settings: {

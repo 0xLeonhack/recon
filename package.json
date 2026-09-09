@@ -22,7 +22,8 @@
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

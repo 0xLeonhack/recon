@@ -7,6 +7,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "dev": "vite",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
@@ -14,18 +15,29 @@
     "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile"
+    "web:build": "vite build",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile && npm run web:build"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
     "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
     "hardhat": "^3.16.0",
     "prettier": "^3.9.6",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.0",
+    "vite": "^8.2.2",
     "viem": "^2.56.3",
     "vitest": "^5.0.0"
   }

@@ -4,13 +4,20 @@ import { createDemoSnapshot } from '../../../src/verifier';
 
 describe('createDemoSnapshot', () => {
   it('marks the normal fixture as verified', () => {
-    expect(createDemoSnapshot('normal').report.status).toBe('VERIFIED');
+    const snapshot = createDemoSnapshot('normal');
+    expect(snapshot.report.status).toBe('VERIFIED');
+    expect(snapshot.report.findings).toHaveLength(2);
+    expect(snapshot.report.findings[1]).toMatchObject({
+      rule: 'R4',
+      reasonCode: 'TIMELINE_ORDER_VERIFIED',
+    });
   });
 
   it('marks the forged response hash as a mismatch', () => {
-    expect(createDemoSnapshot('forged').report).toMatchObject({
-      status: 'MISMATCH',
-      findings: [{ reasonCode: 'GRAPH_RESPONSE_HASH_MISMATCH' }],
+    const report = createDemoSnapshot('forged').report;
+    expect(report.status).toBe('MISMATCH');
+    expect(report.findings[0]).toMatchObject({
+      reasonCode: 'GRAPH_RESPONSE_HASH_MISMATCH',
     });
   });
 
@@ -24,6 +31,7 @@ describe('createDemoSnapshot', () => {
     expect(forgedClaim).toEqual(normalClaim);
     expect(forged.actual).toEqual(normal.actual);
     expect(forged.allowed).toEqual(normal.allowed);
+    expect(forged.timeline).toEqual(normal.timeline);
     expect(forged.correlationId).toBe(normal.correlationId);
   });
 

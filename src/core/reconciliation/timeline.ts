@@ -16,7 +16,7 @@ const REQUIRED_EVENTS: readonly EvidenceEventType[] = [
 ];
 
 export function verifyCorrelationTimeline(events: readonly EvidenceEvent[]): VerificationFinding {
-  const sourceRefs = events.map((event) => `evidence:${event.eventId}`);
+  const sourceRefs = events.map((event) => `${event.subjectRef}#${event.eventId}`);
   if (events.length === 0) {
     return finding(
       'PENDING',

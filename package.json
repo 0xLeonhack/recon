@@ -16,6 +16,7 @@
     "test:contracts": "hardhat test nodejs test/contract/HtsTransferProbe.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
+    "probe:blocky402": "tsx scripts/probe-blocky402.ts",
     "probe:graph": "tsx scripts/probe-graph.ts",
     "probe:hedera": "tsx scripts/probe-hedera.ts",
     "web:build": "vite build",

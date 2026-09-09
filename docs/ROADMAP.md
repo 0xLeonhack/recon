@@ -23,7 +23,7 @@
 
 | 阶段 | 目标 | 当前状态 | 完成证据 |
 |---|---|---|---|
-| S0 | 工程骨架与三个 Gate 0 spike | 未开始 | - |
+| S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成，Gate 0 spike 待执行 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 未开始 | - |
 | S2 | PolicyVault 与共享 Core | 未开始 | - |
 | S3 | 外部适配器与正常 Agent 闭环 | 未开始 | - |
@@ -121,6 +121,8 @@ React 三栏面板
 5. 将验证成功的命令回填到 `AGENTS.md` 和 `README.md`。
 
 完成标准：全新环境可安装依赖；空骨架通过 format、lint、typecheck、test 和 build；没有真实密钥进入 Git 或终端输出。
+
+状态：已完成。实现提交：`4a92bd5`、`49af684`、`3259f98`、`95bdcef`。已验证 `npm ci/install`、format、lint、typecheck、Vitest、Hardhat compile 和 Vite production build；生产依赖审计为 0 漏洞。
 
 ### S0.2 Hedera HTS spike
 

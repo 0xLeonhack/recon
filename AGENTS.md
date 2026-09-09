@@ -38,6 +38,14 @@ short; put durable detail in executable checks or the linked documents.
 - Do not rewrite history, amend, squash, force-push, or run destructive Git
   commands.
 
+## Commands
+
+- Install: `npm ci`
+- Full local check: `npm run check`
+- Contract compile: `npm run contracts:compile`
+- Web build: `npm run web:build`
+- Web development: `npm run dev`
+
 ## Executable Constraints
 
 Rules that code can enforce must not live only as prose:

@@ -4,5 +4,6 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "files": ["hardhat.config.ts", "vite.config.ts", "vitest.config.ts"]
+  "files": ["hardhat.config.ts", "vite.config.ts", "vitest.config.ts"],
+  "include": ["scripts/**/*.ts"]
 }

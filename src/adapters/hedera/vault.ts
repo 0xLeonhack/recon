@@ -58,6 +58,7 @@ export type VaultActionEvent =
       readonly recipient: string;
       readonly amountTinybar: string;
       readonly txHash: string;
+      readonly blockNumber: bigint;
       readonly logIndex: number;
     }
   | {
@@ -65,6 +66,7 @@ export type VaultActionEvent =
       readonly evidenceId: string;
       readonly rejectReason: string;
       readonly txHash: string;
+      readonly blockNumber: bigint;
       readonly logIndex: number;
     };
 
@@ -142,7 +144,7 @@ export async function readVaultState(
 }
 
 export function decodeVaultLog(
-  log: { topics: readonly `0x${string}`[]; data: `0x${string}` },
+  log: { topics: readonly `0x${string}`[]; data: `0x${string}`; blockNumber?: bigint },
   txHash: string,
   logIndex: number,
 ): VaultActionEvent | undefined {
@@ -152,6 +154,7 @@ export function decodeVaultLog(
     data: log.data,
     topics: [log.topics[0] as `0x${string}`, ...log.topics.slice(1)],
   });
+  const blockNumber = log.blockNumber ?? 0n;
   if (decoded.eventName === 'ActionExecuted') {
     const args = decoded.args as unknown as {
       evidenceId: string;
@@ -164,6 +167,7 @@ export function decodeVaultLog(
       recipient: getAddress(args.recipient),
       amountTinybar: args.amount.toString(),
       txHash,
+      blockNumber,
       logIndex,
     };
   }
@@ -174,6 +178,7 @@ export function decodeVaultLog(
       evidenceId: args.evidenceId,
       rejectReason: REJECT_REASON_NAMES[Number(args.reason)] ?? `Unknown(${Number(args.reason)})`,
       txHash,
+      blockNumber,
       logIndex,
     };
   }
@@ -209,7 +214,7 @@ export async function readVaultActions(
   const events: VaultActionEvent[] = [];
   for (const log of logs) {
     const decoded = decodeVaultLog(
-      { topics: log.topics, data: log.data },
+      { topics: log.topics, data: log.data, blockNumber: log.blockNumber },
       log.transactionHash ?? '',
       log.logIndex ?? 0,
     );

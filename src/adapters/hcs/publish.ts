@@ -56,7 +56,7 @@ export async function publishEvidenceEvent(
 export interface HcsClientConfig {
   /** Hedera account id paying for the submit transactions, e.g. `0.0.1234`. */
   readonly operatorId: string;
-  /** Operator private key (DER, raw ECDSA or ED25519). */
+  /** ECDSA operator private key in DER or raw hex form. */
   readonly operatorKey: string;
 }
 
@@ -64,7 +64,7 @@ export function createTestnetClient(config: HcsClientConfig): Client {
   const client = Client.forTestnet();
   client.setOperator(
     AccountId.fromString(config.operatorId),
-    PrivateKey.fromString(config.operatorKey),
+    PrivateKey.fromStringECDSA(config.operatorKey),
   );
   return client;
 }

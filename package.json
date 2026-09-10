@@ -16,6 +16,7 @@
     "test:contracts": "hardhat test nodejs",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
+    "accounts:create": "tsx scripts/create-accounts.ts",
     "vault:deploy": "hardhat run scripts/deploy-vault.ts --network hederaTestnet",
     "topic:create": "tsx scripts/create-topic.ts",
     "api:start": "tsx scripts/serve-api.ts",

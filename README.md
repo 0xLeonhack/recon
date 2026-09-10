@@ -79,9 +79,20 @@ Node.js ≥ 22.13.
 
 ```bash
 npm ci
-npm run check        # format + lint + typecheck + 95 unit tests + contract compile + web build
-npm run test:contracts  # 11 Solidity tests: mandate, roles, stake isolation, slash, kill-switch
+npm run check        # format + lint + typecheck + 109 unit tests + contract compile + web build
+npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, slash, kill-switch
 ```
+
+### Setup (`cp .env.example .env`)
+
+| Group | How to obtain |
+|---|---|
+| Hedera accounts (`HEDERA_OPERATOR_ID`, `HEDERA_PRIVATE_KEY`, agent/verifier/operator keys + addresses) | Create free testnet accounts at [portal.hedera.com](https://portal.hedera.com). The portal faucet is limited per user; additional ECDSA accounts can be created on-chain from the owner account with `scripts/create-accounts.ts`. Top up anytime via the web faucet (100 testnet HBAR per claim). Use **ECDSA** keys; each vault role must be a **distinct** account. |
+| `HEDERA_TOPIC_ID`, `VAULT_ADDRESS` | Produced by `npm run topic:create` and `npm run vault:deploy` — paste both outputs back into `.env`. |
+| `GRAPH_API_KEY`, `GRAPH_DEPLOYMENT_ID`, `GRAPH_FINAL_BLOCK_NUMBER` | API key from [thegraph.com](https://thegraph.com) dashboard; deployment ID of the subgraph to pin (we verified against the official Uniswap V3 deployment); a block number already indexed by that deployment. |
+| `X402_VERIFY_PAYTO`, `X402_VERIFY_PRICE_TINYBAR` | Your EVM address receiving API payments; price in tinybar (default `10000000` = 0.1 HBAR). |
+
+> **Note:** the live demo scripts (`api:start`, `pay:header`, `run:live`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. The demo assumes values in Hedera's relay semantics: `msg.value`-style amounts (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar; calldata-style amounts (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
 
 Verify a correlation end-to-end (reconciliation core, deterministic):
 
@@ -100,18 +111,45 @@ npm run probe:graph    # double-replay at pinned block (needs GRAPH_API_KEY + de
 
 The web panel (`npm run dev`) renders the same verifier output with a Normal / Forged-hash toggle. Web and CLI share one verification core; the frontend implements no rules of its own.
 
+### Live end-to-end on Hedera testnet
+
+All of the below run against real services — real HCS messages, real vault transactions, a real 402 payment. Nothing falls back to mocks; a missing credential aborts with `UNVERIFIABLE`.
+
+```bash
+npm run api:start     # x402-gated verify-query API on :4020 (set X402_VERIFY_SERVICE_URL)
+npm run pay:header    # agent signs the fee-sponsored HBAR transfer; writes X402_PAYMENT_HEADER to .env
+npm run run:live      # full loop: Graph query → 402 + paid verify → vault execute → 4 HCS evidence events
+npm run verify:live   # independent verifier: replays evidence from HCS + vault + Graph → report
+npm run slash:forged  # forged correlation → verifier submits slash(evidenceHash) against operator stake
+npm run kill:switch   # owner freezes the vault → further agent actions rejected with NotActive
+```
+
+## Deployed on Hedera testnet
+
+Live instance used by the demo (all values public — no keys in this repository):
+
+| Item | Value |
+|---|---|
+| Network | Hedera testnet · chain ID 296 · [HashScan](https://hashscan.io/testnet/contract/0xe29a17861675c7150bf70107d9c239c8d423666a) |
+| `PolicyVault` | [`0xe29a17861675c7150bf70107d9c239c8d423666a`](https://hashscan.io/testnet/contract/0xe29a17861675c7150bf70107d9c239c8d423666a) — Active, budget cap 4 HBAR, deadline 2026-09-17 |
+| HCS evidence topic | [`0.0.10456868`](https://hashscan.io/testnet/topic/0.0.10456868) |
+| Vault principal | funded 4 HBAR — tx [`0x5c5eec8f…331a2a41c`](https://hashscan.io/testnet/transaction/0x5c5eec8fbd7d61035722e4c53d4a6aae36734cee83660946f1f7ddb331a2a41c) |
+| Operator stake | funded 2 HBAR — tx [`0x5db307ea…d0c55d1956`](https://hashscan.io/testnet/transaction/0x5db307eaa529bf58d0d51d59b1e59316c821a63b5fdaf4d6c7fc45d0c55d1956) |
+| Pinned Graph target | official Uniswap V3 deployment `QmTZ8ejXJxRo7vDBS4uwqBeGoxLSWbhaA7oXa1RvxunLy7`, Ethereum mainnet block `25946145`; double-replay hash `0x41f0335a…4f2f71e72` (matched twice) |
+
 ## Status — what is proven vs in progress
 
 No mock is presented as live evidence. Per-evidence tracking: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 | Component | State |
 |---|---|
-| Reconciliation core R1–R5, canonicalization, SHA-256 hashing | ✅ implemented, 95 unit tests |
-| `PolicyVault` (HBAR mandate, stake isolation, slash, kill-switch) | ✅ 11 contract tests; testnet deploy pending credentials |
+| Reconciliation core R1–R5, canonicalization, SHA-256 hashing | ✅ implemented, 109 unit tests |
+| `PolicyVault` (HBAR mandate, stake isolation, slash, kill-switch) | ✅ 7 contract tests; **deployed & funded on testnet** (see above) |
+| HCS evidence timeline | ✅ topic live; publish path exercised by `run:live` |
 | Blocky402 facilitator discovery + 402 contract | ✅ verified live (`hedera:testnet`, x402 v2) |
 | Hedera testnet RPC | ✅ verified live (chain ID 296) |
-| The Graph double-replay | 🔶 code + tests done; live query needs `GRAPH_API_KEY` |
-| Real x402 payment loop, HCS publish, live end-to-end run | 🔶 pending testnet credentials |
+| The Graph double-replay | 🔶 verified live against the official Uniswap V3 deployment; small adapter patch for the network gateway's `_meta` hash semantics pending re-apply |
+| Real x402 payment loop, live end-to-end run | ✅ verified live end-to-end (`run:live`: Graph query → 402 payment → vault execute → HCS) |
 | Bazantic Recipe wiring, video | ⬜ planned |
 
 ## Stack
@@ -126,7 +164,7 @@ src/core/    types · canonicalization · hashing · R1-R5 reconciliation (pure)
 src/adapters/ thegraph · blocky402 · hcs   (narrow network boundaries)
 src/agent/   deterministic tool workflow     src/verifier/  report assembly
 src/api/     x402 verify-query service       web/           React panel
-scripts/     probes + deployment             docs/          PRD · roadmap · track guides
+scripts/     probes · deployment · live demo · slashing   docs/  PRD · roadmap · track guides
 ```
 
 Full docs: [`docs/prd.md`](docs/prd.md) (product & acceptance) · [`docs/ROADMAP.md`](docs/ROADMAP.md) (build order & evidence) · [`docs/project-brief.md`](docs/project-brief.md) (external narrative).

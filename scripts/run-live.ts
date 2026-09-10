@@ -1,14 +1,16 @@
 import { keccak256, toBytes } from 'viem';
 
 import {
+  DEMO_DATA_QUERY,
   GraphReplayError,
+  hashGraphData,
   loadGraphProbeConfig,
   type GraphProbeConfig,
 } from '../src/adapters/graph';
 import { createSdkSubmitter, createTestnetClient, publishEvidenceEvent } from '../src/adapters/hcs';
 import { executeVaultAction } from '../src/adapters/hedera';
 import type { EvidenceEvent } from '../src/core';
-import { hashCanonicalJson, sha256Hex } from '../src/core';
+import { hashCanonicalJson, sha256Hex, type JsonValue } from '../src/core';
 
 /**
  * Live demo runner: one correlation, real services, no mocks.
@@ -29,15 +31,6 @@ function requireEnv(name: string): string {
   }
   return value.trim();
 }
-
-const DEMO_DATA_QUERY = `
-  query ReconPoolData($blockNumber: Int!) {
-    pools(first: 1, orderBy: totalValueLockedUSD, orderDirection: desc, block: { number: $blockNumber }) {
-      id
-      totalValueLockedUSD
-    }
-  }
-`;
 
 const forged = process.argv.includes('--forged');
 const correlationId = process.env.RECON_CORRELATION_ID ?? `live-${Date.now()}`;
@@ -82,9 +75,10 @@ async function runGraphQuery(): Promise<{ event: EvidenceEvent; response: unknow
     throw new GraphReplayError('HTTP_ERROR');
   }
   if (!response.ok) throw new GraphReplayError('HTTP_ERROR');
-  const parsed = (await response.json()) as Record<string, unknown>;
+  const parsed = (await response.json()) as { data?: unknown };
+  if (parsed.data === undefined) throw new GraphReplayError('INVALID_RESPONSE');
 
-  const replayedHash = hashCanonicalJson(parsed as never);
+  const replayedHash = hashGraphData(parsed.data as JsonValue);
   const claimedHash = forged ? sha256Hex('forged-response-hash-for-demo') : replayedHash;
 
   const event: EvidenceEvent = {

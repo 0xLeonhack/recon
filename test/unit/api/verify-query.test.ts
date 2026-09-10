@@ -114,6 +114,19 @@ describe('createVerifyQueryHandler', () => {
     );
   });
 
+  it('serves a replayed payment header from cache without re-settling', async () => {
+    const fetchImpl = facilitatorStub();
+    const handler = createVerifyQueryHandler({ ...config, fetchImpl });
+
+    const first = await handler({ headers: { 'x-payment': 'payment-header' }, body: requestBody });
+    const second = await handler({ headers: { 'x-payment': 'payment-header' }, body: requestBody });
+
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+    // One /verify + one /settle; the replayed header never reached the facilitator.
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('reports a MISMATCH for a forged hash while still settling honestly', async () => {
     const handler = createVerifyQueryHandler({ ...config, fetchImpl: facilitatorStub() });
 

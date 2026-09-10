@@ -1,2 +1,3 @@
 export { loadGraphProbeConfig, type GraphProbeConfig } from './config';
-export { GraphReplayError, replayGraphMeta, type GraphReplayResult } from './replay';
+export { DEMO_DATA_QUERY, hashGraphData } from './query';
+export { GraphReplayError, replayGraphData, type GraphReplayResult } from './replay';

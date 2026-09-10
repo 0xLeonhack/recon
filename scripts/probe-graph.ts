@@ -1,8 +1,8 @@
-import { GraphReplayError, loadGraphProbeConfig, replayGraphMeta } from '../src/adapters/graph';
+import { GraphReplayError, loadGraphProbeConfig, replayGraphData } from '../src/adapters/graph';
 
 try {
   const config = loadGraphProbeConfig(process.env);
-  const result = await replayGraphMeta(config);
+  const result = await replayGraphData(config);
 
   console.log(
     JSON.stringify({

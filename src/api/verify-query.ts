@@ -100,6 +100,9 @@ function facilitatorFailure(error: BlockyFacilitateError): VerifyQueryResponse {
 export function createVerifyQueryHandler(config: VerifyQueryConfig) {
   const requirements = buildRequirements(config);
   const fetchImpl = config.fetchImpl ?? fetch;
+  // x402 payment headers are single-use; remember settled responses so a
+  // replayed header returns the original result instead of re-settling.
+  const settled = new Map<string, VerifyQueryResponse>();
 
   return async function handleVerifyQuery(
     request: VerifyQueryRequest,
@@ -113,6 +116,9 @@ export function createVerifyQueryHandler(config: VerifyQueryConfig) {
     if (paymentHeader === undefined || paymentHeader.trim().length === 0) {
       return paymentRequired(requirements);
     }
+
+    const cached = settled.get(paymentHeader);
+    if (cached !== undefined) return cached;
 
     const facilitateInput = { paymentHeader, requirements };
     try {
@@ -137,7 +143,7 @@ export function createVerifyQueryHandler(config: VerifyQueryConfig) {
 
       const settlement = await settlePayment(config.facilitatorBaseUrl, facilitateInput, fetchImpl);
 
-      return {
+      const response: VerifyQueryResponse = {
         status: 200,
         body: {
           schemaVersion: VERIFY_QUERY_SCHEMA_VERSION,
@@ -151,6 +157,8 @@ export function createVerifyQueryHandler(config: VerifyQueryConfig) {
           ...(verification.payer === undefined ? {} : { payer: verification.payer }),
         },
       };
+      settled.set(paymentHeader, response);
+      return response;
     } catch (error) {
       if (error instanceof BlockyFacilitateError) {
         return facilitatorFailure(error);

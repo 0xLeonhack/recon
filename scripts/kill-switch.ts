@@ -1,4 +1,4 @@
-import { keccak256, toBytes } from 'viem';
+import { getAddress, keccak256, toBytes } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createWalletClient, http } from 'viem';
 
@@ -38,6 +38,20 @@ const abi = loadVaultAbi();
 
 // 1. Owner freezes the vault.
 const ownerAccount = privateKeyToAccount(ownerKey as `0x${string}`);
+const onChainOwner = (await publicClient.readContract({
+  address: vaultAddress as `0x${string}`,
+  abi,
+  functionName: 'owner',
+})) as string;
+if (getAddress(onChainOwner) !== ownerAccount.address) {
+  console.error(
+    JSON.stringify({
+      status: 'UNVERIFIABLE',
+      reason: `HEDERA_OWNER_PRIVATE_KEY does not match vault owner ${onChainOwner}`,
+    }),
+  );
+  process.exit(1);
+}
 const ownerWallet = createWalletClient({
   account: ownerAccount,
   chain: hederaTestnet,

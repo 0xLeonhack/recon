@@ -18,6 +18,8 @@
     "contracts:compile": "hardhat compile",
     "accounts:create": "tsx scripts/create-accounts.ts",
     "vault:deploy": "hardhat run scripts/deploy-vault.ts --network hederaTestnet",
+    "vault:fund": "tsx scripts/fund-vault.ts",
+    "vault:stake": "tsx scripts/deposit-stake.ts",
     "topic:create": "tsx scripts/create-topic.ts",
     "api:start": "tsx scripts/serve-api.ts",
     "run:live": "tsx scripts/run-live.ts",

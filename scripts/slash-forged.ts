@@ -4,7 +4,7 @@ import {
   loadVaultAbi,
   readVaultState,
 } from '../src/adapters/hedera';
-import { GraphReplayError, loadGraphProbeConfig, replayGraphMeta } from '../src/adapters/graph';
+import { GraphReplayError, loadGraphProbeConfig, replayGraphData } from '../src/adapters/graph';
 import { readTopicEvidence } from '../src/adapters/hcs';
 import { createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -65,7 +65,7 @@ if (claimedHash === undefined) fail('UNVERIFIABLE', 'DATA_QUERY_EVIDENCE_INCOMPL
 
 let replayedHash: `0x${string}`;
 try {
-  const replay = await replayGraphMeta(graphConfig);
+  const replay = await replayGraphData(graphConfig);
   replayedHash = replay.firstResponseHash;
 } catch (error) {
   const reason = error instanceof GraphReplayError ? error.code : 'UNKNOWN';
@@ -91,7 +91,7 @@ const mismatchEvidence = {
   canonicalizationVersion: 'recon-json-v1',
 };
 const evidenceHash = hashCanonicalJson(mismatchEvidence);
-const evidenceHashBytes = toBytes32(evidenceHash);
+const evidenceHashBytes = asBytes32(evidenceHash);
 
 // ---------- Slash with the verifier role ----------
 
@@ -138,6 +138,9 @@ console.log(
   ),
 );
 
-function toBytes32(hash: string): `0x${string}` {
+function asBytes32(hash: string): `0x${string}` {
+  if (!/^0x[0-9a-f]{64}$/.test(hash)) {
+    fail('INVALID', 'evidenceHash is not a 32-byte hex string');
+  }
   return hash as `0x${string}`;
 }

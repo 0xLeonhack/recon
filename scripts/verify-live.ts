@@ -1,5 +1,10 @@
-import { createVaultPublicClient, readVaultActions, readVaultState } from '../src/adapters/hedera';
-import { GraphReplayError, loadGraphProbeConfig, replayGraphMeta } from '../src/adapters/graph';
+import {
+  createVaultPublicClient,
+  readVaultActions,
+  readVaultState,
+  type VaultActionEvent,
+} from '../src/adapters/hedera';
+import { GraphReplayError, loadGraphProbeConfig, replayGraphData } from '../src/adapters/graph';
 import { readTopicEvidence } from '../src/adapters/hcs';
 import {
   createVerificationReport,
@@ -28,6 +33,16 @@ const rpcUrl = process.env.HEDERA_RPC_URL ?? DEFAULT_HEDERA_TESTNET_RPC_URL;
 function fail(status: 'UNVERIFIABLE' | 'INVALID', reason: string): never {
   console.error(JSON.stringify({ status, reason }));
   process.exit(1);
+}
+
+function compareVaultEvents(
+  left: { blockNumber: bigint; logIndex: number },
+  right: { blockNumber: bigint; logIndex: number },
+): number {
+  if (left.blockNumber !== right.blockNumber) {
+    return left.blockNumber < right.blockNumber ? -1 : 1;
+  }
+  return left.logIndex - right.logIndex;
 }
 
 if (correlationId.trim().length === 0 || correlationId.startsWith('--')) {
@@ -76,7 +91,7 @@ if (dataQuery === undefined || dataQueryHash === undefined) {
 const findings: VerificationFinding[] = [];
 
 try {
-  const replay = await replayGraphMeta(graphConfig);
+  const replay = await replayGraphData(graphConfig);
   const replayedHash = replay.firstResponseHash;
   findings.push(
     verifyGraphResponseHash({
@@ -111,6 +126,15 @@ const vaultState = await readVaultState(publicClient, vaultAddress);
 const vaultEvents = await readVaultActions(publicClient, vaultAddress, { fromBlock: 0n });
 
 const executedEvents = timeline.filter((event) => event.type === 'ACTION_EXECUTED');
+
+// Successful executions in consensus order. The vault budget is global, so the
+// spend level that preceded an action includes every earlier execution.
+const allExecutions = vaultEvents
+  .filter(
+    (event): event is Extract<VaultActionEvent, { kind: 'ActionExecuted' }> =>
+      event.kind === 'ActionExecuted',
+  )
+  .sort(compareVaultEvents);
 
 for (const executedEvent of executedEvents) {
   const evidenceId = executedEvent.evidence.evidenceId;
@@ -150,12 +174,16 @@ for (const executedEvent of executedEvents) {
   }
 
   const block = await publicClient.getBlock({ blockNumber: vaultEvent.blockNumber });
-  // Budget accounting: current spent includes this action; the mandate check
-  // uses the spend level before it.
   const mandate: EffectiveMandate = {
-    status: vaultState.status,
+    // A successful ActionExecuted event can only be emitted while the vault is
+    // Active (execute() rejects otherwise), so the execution-time status is
+    // Active regardless of the vault's current status.
+    status: 'Active',
     budgetCap: vaultState.budgetCapTinybar,
-    spentBefore: (BigInt(vaultState.spentTinybar) - BigInt(amount)).toString(),
+    spentBefore: allExecutions
+      .filter((event) => compareVaultEvents(event, vaultEvent) < 0)
+      .reduce((sum, event) => sum + BigInt(event.amountTinybar), 0n)
+      .toString(),
     deadline: vaultState.deadlineUnixSeconds,
     recipients: (process.env.VAULT_ALLOWED_RECIPIENTS ?? '')
       .split(',')
@@ -197,8 +225,13 @@ const claimedSet: ClaimedAction[] = executedEvents.flatMap((event) => {
     },
   ];
 });
+// The vault is shared across correlations and its events carry only an
+// evidenceId (no correlationId), so scope the actual set to the evidenceIds
+// this correlation actually claimed. Attributing an unclaimed execution to a
+// specific correlation would require a correlationId on-chain.
+const claimedEvidenceIds = new Set(claimedSet.map((action) => action.evidenceId.toLowerCase()));
 const actualSet = vaultEvents.flatMap((event) =>
-  event.kind === 'ActionExecuted'
+  event.kind === 'ActionExecuted' && claimedEvidenceIds.has(event.evidenceId.toLowerCase())
     ? [
         {
           evidenceId: event.evidenceId,

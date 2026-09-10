@@ -1,23 +1,12 @@
-import { createPublicClient, defineChain, http } from 'viem';
+import { createPublicClient, http } from 'viem';
 
-const HEDERA_TESTNET_CHAIN_ID = 296;
-const DEFAULT_RPC_URL = 'https://testnet.hashio.io/api';
+import {
+  DEFAULT_HEDERA_TESTNET_RPC_URL,
+  HEDERA_TESTNET_CHAIN_ID,
+  hederaTestnet,
+} from '../src/adapters/hedera';
 
-const rpcUrl = process.env.HEDERA_RPC_URL ?? DEFAULT_RPC_URL;
-const hederaTestnet = defineChain({
-  id: HEDERA_TESTNET_CHAIN_ID,
-  name: 'Hedera Testnet',
-  nativeCurrency: {
-    name: 'HBAR',
-    symbol: 'HBAR',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: [rpcUrl],
-    },
-  },
-});
+const rpcUrl = process.env.HEDERA_RPC_URL ?? DEFAULT_HEDERA_TESTNET_RPC_URL;
 
 const client = createPublicClient({
   chain: hederaTestnet,

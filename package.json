@@ -16,6 +16,7 @@
     "test:contracts": "hardhat test nodejs",
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
+    "vault:deploy": "hardhat run scripts/deploy-vault.ts --network hederaTestnet",
     "demo:verify": "tsx scripts/verify-demo.ts",
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "probe:blocky402": "tsx scripts/probe-blocky402.ts",

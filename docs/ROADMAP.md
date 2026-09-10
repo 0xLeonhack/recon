@@ -167,7 +167,7 @@ React 三栏面板
 
 失败降级：若 Blocky402 与 Bazantic 不能共用网关，为同一 API 提供两个薄适配器；若真实支付仍不可用，立即重新评估对应赛道，不用 mock 冒充完成。
 
-状态：进行中。`c886c77`、`6c52b42` 已实现 facilitator 支持发现（scheme exact / hedera:testnet / x402 v2），`c57c79f` 提供实网探测命令。`POST /verify-query` 服务、真实 402→付款→重试闭环与 Bazantic 兼容性判断待完成。
+状态：进行中。`c886c77`、`6c52b42` 已实现 facilitator 支持发现（scheme exact / hedera:testnet / x402 v2），`c57c79f` 提供实网探测命令。`3643a52`、`b16c9f5` 补充 facilitator verify/settle 适配器与 402 门禁 verify-query 服务；`npm run probe:x402` 已实测：facilitator 支持 VERIFIED（feePayer `0.0.7162784`）、服务 402 合约 VERIFIED，真实 402→付款→重试闭环仍需付款人凭据，Gate 保持 OPEN。
 
 ### S0 Gate
 

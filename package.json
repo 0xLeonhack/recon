@@ -20,6 +20,7 @@
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "probe:blocky402": "tsx scripts/probe-blocky402.ts",
     "probe:graph": "tsx scripts/probe-graph.ts",
+    "probe:x402": "tsx scripts/probe-x402.ts",
     "probe:hedera": "tsx scripts/probe-hedera.ts",
     "web:build": "vite build",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile && npm run web:build"

@@ -25,6 +25,7 @@ Focused verification commands:
 npm run test:contracts
 npm run probe:hedera
 npm run probe:graph
+npm run probe:x402
 ```
 
 The development server prints its local URL. Copy `.env.example` to `.env` only when running an

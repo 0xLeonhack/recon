@@ -46,6 +46,7 @@ short; put durable detail in executable checks or the linked documents.
 - Contract tests: `npm run test:contracts`
 - Hedera RPC probe: `npm run probe:hedera`
 - The Graph replay probe: `npm run probe:graph`
+- x402 / Blocky402 probe: `npm run probe:x402`
 - Web build: `npm run web:build`
 - Web development: `npm run dev`
 

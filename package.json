@@ -23,6 +23,8 @@
     "demo:verify": "tsx scripts/verify-demo.ts",
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "verify:live": "tsx scripts/verify-live.ts",
+    "slash:forged": "tsx scripts/slash-forged.ts",
+    "kill:switch": "tsx scripts/kill-switch.ts",
     "probe:blocky402": "tsx scripts/probe-blocky402.ts",
     "probe:graph": "tsx scripts/probe-graph.ts",
     "probe:x402": "tsx scripts/probe-x402.ts",

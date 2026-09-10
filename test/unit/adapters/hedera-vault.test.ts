@@ -33,6 +33,7 @@ describe('decodeVaultLog round-trip', () => {
       recipient,
       amountTinybar: '40',
       txHash: '0xabc1',
+      blockNumber: 0n,
       logIndex: 3,
     });
   });
@@ -55,6 +56,7 @@ describe('decodeVaultLog round-trip', () => {
       evidenceId,
       rejectReason: 'BudgetExceeded',
       txHash: '0xabc2',
+      blockNumber: 0n,
       logIndex: 1,
     });
   });

@@ -25,9 +25,9 @@
 | S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成；S0.2 RPC 已实测、合约测试通过；S0.3 重放代码就绪；S0.4 facilitator 发现已实测。实网部署/付款待凭据 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 进行中 | Evidence/Verification v1 与 canonicalization 有实现和单测（`fb9a9f7`-`96d1a8c`）；PolicyVault v1 接口落地（`c8f4092`）。冻结签收待 Gate 0 |
 | S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约与 11 个合约测试通过（`c8f4092`、`b401a1e`）；R1/R2/R4 对账核心已实现。testnet 部署待凭据 |
-| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | 确定性 Agent 工作流骨架与时间线校验完成（`444e27e`）；HCS mirror 读适配器完成（`0e5c062`）。hedera 提交、HCS 发布、x402 付款与真实闭环未实现 |
-| S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测：R1/R2/R4（`13da70a`-`d97a6f2`）、R3/R5（`a4d61e2`）；CLI `demo:verify` 覆盖 normal/forged。CLI 待接真实链上证据 |
-| S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 路径已检测为 MISMATCH（`8a61146`、`4dd39e8`）。链上 slash 与 kill-switch 演示待部署 |
+| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | hedera vault 读/执行适配器（`56d96b3`）、HCS 读（`0e5c062`）+ 发布（`cdb6e61`）、live runner（`994988a`）完成；`run:live` 真实闭环与 x402 程序化付款待凭据 |
+| S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测（`a4d61e2`）；`verify:live` CLI 从 HCS+vault+Graph 真实证据出报告（`9ca0157`）。R5 结算回单查询待 facilitator 接口 |
+| S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 检测完成；`slash:forged`（确定性 evidenceHash → slash）与 `kill:switch`（冻结 → NotActive 拒绝）脚本就绪（`8a45d23`）。实网执行待凭据 |
 | S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`）。付费 API 与 Bazantic Recipe 未开始 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |
 
@@ -167,7 +167,7 @@ React 三栏面板
 
 失败降级：若 Blocky402 与 Bazantic 不能共用网关，为同一 API 提供两个薄适配器；若真实支付仍不可用，立即重新评估对应赛道，不用 mock 冒充完成。
 
-状态：进行中。`c886c77`、`6c52b42` 已实现 facilitator 支持发现（scheme exact / hedera:testnet / x402 v2），`c57c79f` 提供实网探测命令。`3643a52`、`b16c9f5` 补充 facilitator verify/settle 适配器与 402 门禁 verify-query 服务；`npm run probe:x402` 已实测：facilitator 支持 VERIFIED（feePayer `0.0.7162784`）、服务 402 合约 VERIFIED，真实 402→付款→重试闭环仍需付款人凭据，Gate 保持 OPEN。
+状态：进行中。`c886c77`、`6c52b42` 已实现 facilitator 支持发现（scheme exact / hedera:testnet / x402 v2），`c57c79f` 提供实网探测命令。`3643a52`、`b16c9f5` 补充 facilitator verify/settle 适配器与 402 门禁 verify-query 服务；`npm run probe:x402` 已实测：facilitator 支持 VERIFIED（feePayer `0.0.7162784`）、服务 402 合约 VERIFIED。`994988a` 起真实 402→付款→重试闭环支持 out-of-band 付款头（`X402_PAYMENT_HEADER`），程序化付款人仍待 Blocky402 付款 schema 实测，Gate 保持 OPEN。
 
 ### S0 Gate
 

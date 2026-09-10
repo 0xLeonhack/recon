@@ -1,4 +1,5 @@
 import type { VerificationFinding } from '../types';
+import { parseUnsigned, sameAddress } from './values';
 
 export interface ActualAction {
   readonly recipient: string;
@@ -56,15 +57,4 @@ export function verifyActionAllowed(
   function mismatch(reasonCode: string, message: string): VerificationFinding {
     return { rule: 'R2', status: 'MISMATCH', reasonCode, message, sourceRefs };
   }
-}
-
-function parseUnsigned(value: string, field: string): bigint {
-  if (!/^(0|[1-9]\d*)$/.test(value)) {
-    throw new TypeError(`${field} must be an unsigned decimal string`);
-  }
-  return BigInt(value);
-}
-
-function sameAddress(left: string, right: string): boolean {
-  return left.toLowerCase() === right.toLowerCase();
 }

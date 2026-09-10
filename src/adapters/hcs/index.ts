@@ -7,3 +7,13 @@ export {
   type TopicMessage,
   type TopicReadResult,
 } from './read';
+export {
+  createSdkSubmitter,
+  createTestnetClient,
+  encodeEvidenceEvent,
+  HcsPublishError,
+  publishEvidenceEvent,
+  type EvidenceSubmitResult,
+  type HcsClientConfig,
+  type HcsSubmitTransport,
+} from './publish';

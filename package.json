@@ -17,6 +17,7 @@
     "test:watch": "vitest --config vitest.config.ts",
     "contracts:compile": "hardhat compile",
     "vault:deploy": "hardhat run scripts/deploy-vault.ts --network hederaTestnet",
+    "topic:create": "tsx scripts/create-topic.ts",
     "demo:verify": "tsx scripts/verify-demo.ts",
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "probe:blocky402": "tsx scripts/probe-blocky402.ts",
@@ -27,6 +28,7 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run contracts:compile && npm run web:build"
   },
   "dependencies": {
+    "@hashgraph/sdk": "^2.81.0",
     "@noble/hashes": "^2.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

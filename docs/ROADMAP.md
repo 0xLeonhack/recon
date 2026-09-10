@@ -25,8 +25,8 @@
 | S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成；S0.2 RPC 已实测、合约测试通过；S0.3 重放代码就绪；S0.4 facilitator 发现已实测。实网部署/付款待凭据 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 进行中 | Evidence/Verification v1 与 canonicalization 有实现和单测（`fb9a9f7`-`96d1a8c`）；PolicyVault v1 接口落地（`c8f4092`）。冻结签收待 Gate 0 |
 | S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约与 11 个合约测试通过（`c8f4092`、`b401a1e`）；R1/R2/R4 对账核心已实现。testnet 部署待凭据 |
-| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | 确定性 Agent 工作流骨架与时间线校验完成（`444e27e`）。hedera/hcs/x402 付款适配器与真实闭环未实现 |
-| S4 | Verifier Core 与独立 CLI | 进行中 | R1/R2/R4 与聚合报告完成，CLI `demo:verify` 覆盖 normal/forged（`13da70a`-`d97a6f2`）。R3/R5 待实现，CLI 待接真实证据 |
+| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | 确定性 Agent 工作流骨架与时间线校验完成（`444e27e`）；HCS mirror 读适配器完成（`0e5c062`）。hedera 提交、HCS 发布、x402 付款与真实闭环未实现 |
+| S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测：R1/R2/R4（`13da70a`-`d97a6f2`）、R3/R5（`a4d61e2`）；CLI `demo:verify` 覆盖 normal/forged。CLI 待接真实链上证据 |
 | S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 路径已检测为 MISMATCH（`8a61146`、`4dd39e8`）。链上 slash 与 kill-switch 演示待部署 |
 | S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`）。付费 API 与 Bazantic Recipe 未开始 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |

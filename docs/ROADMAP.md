@@ -9,27 +9,26 @@
 
 ## 1. 当前状态
 
-仓库目前处于文档阶段：
+仓库已完成最小工程骨架，并提前实现了大量 S1-S6 代码：
 
-- Git 已初始化，`main` 与 `origin/main` 一致。
-- 当前只有 `README.md` 和本地 `docs/` 资料，没有应用脚手架、合约、依赖清单或测试命令。
-- 技术栈已经在 PRD 中确定：Solidity + Hardhat、TypeScript、Vite + React、Hedera testnet、HCS、The Graph、x402 / Blocky402 和 Bazantic。
-- `AGENTS.md` 已定义产品边界、工程规范、安全约束和完成标准。
-- 开发必须从 Gate 0 外部依赖验证开始，不能先扩展 UI 或 P2 功能。
-
-因此，第一步不是一次性搭建完整系统，而是建立最小可运行骨架，并用三个独立 spike 消除最可能阻断 Demo 的风险。
+- S0.1 骨架完成；S0.2/S0.3 spike 代码就绪，S0.4 完成 facilitator 支持发现。
+- Evidence/Verification v1 类型、canonicalization、hash、R1/R2/R4 对账核心已实现并有单元测试。
+- `PolicyVault` 已实现单资产 HBAR 版本（HTS 探针稳定后仍可评估切回），合约测试通过。
+- Agent 确定性工作流、verifier 演示快照、CLI（`demo:verify` / `demo:verify:forged`）与 Web 面板雏形已就位。
+- 全部演示数据仍为 `LOCAL_FIXTURE`；实网证据被凭据阻塞：缺 testnet 私钥、`GRAPH_API_KEY`、deployment ID 与 Blocky402 付款。
+- Gate 0 未通过前，新工作只允许 spike 代码、工程基础和文档。
 
 ### 阶段状态
 
 | 阶段 | 目标 | 当前状态 | 完成证据 |
 |---|---|---|---|
-| S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成；Hedera/Graph 代码就绪，实网 Gate 待凭证 |
-| S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 未开始 | - |
-| S2 | PolicyVault 与共享 Core | 未开始 | - |
-| S3 | 外部适配器与正常 Agent 闭环 | 未开始 | - |
-| S4 | Verifier Core 与独立 CLI | 未开始 | - |
-| S5 | 作弊、罚没与冻结演示 | 未开始 | - |
-| S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 未开始 | - |
+| S0 | 工程骨架与三个 Gate 0 spike | 进行中 | S0.1 已完成；S0.2 RPC 已实测、合约测试通过；S0.3 重放代码就绪；S0.4 facilitator 发现已实测。实网部署/付款待凭据 |
+| S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 进行中 | Evidence/Verification v1 与 canonicalization 有实现和单测（`fb9a9f7`-`96d1a8c`）；PolicyVault v1 接口落地（`c8f4092`）。冻结签收待 Gate 0 |
+| S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约与 11 个合约测试通过（`c8f4092`、`b401a1e`）；R1/R2/R4 对账核心已实现。testnet 部署待凭据 |
+| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | 确定性 Agent 工作流骨架与时间线校验完成（`444e27e`）。hedera/hcs/x402 付款适配器与真实闭环未实现 |
+| S4 | Verifier Core 与独立 CLI | 进行中 | R1/R2/R4 与聚合报告完成，CLI `demo:verify` 覆盖 normal/forged（`13da70a`-`d97a6f2`）。R3/R5 待实现，CLI 待接真实证据 |
+| S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 路径已检测为 MISMATCH（`8a61146`、`4dd39e8`）。链上 slash 与 kill-switch 演示待部署 |
+| S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`）。付费 API 与 Bazantic Recipe 未开始 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |
 
 状态只使用 `未开始`、`进行中`、`阻塞`、`已完成`。只有满足该阶段完成标准并记录可复验证据后，才能标记为 `已完成`。
@@ -167,6 +166,8 @@ React 三栏面板
 交付证据：402 响应、支付引用、结算交易、服务响应、Gateway/Recipe 链接和复验命令。
 
 失败降级：若 Blocky402 与 Bazantic 不能共用网关，为同一 API 提供两个薄适配器；若真实支付仍不可用，立即重新评估对应赛道，不用 mock 冒充完成。
+
+状态：进行中。`c886c77`、`6c52b42` 已实现 facilitator 支持发现（scheme exact / hedera:testnet / x402 v2），`c57c79f` 提供实网探测命令。`POST /verify-query` 服务、真实 402→付款→重试闭环与 Bazantic 兼容性判断待完成。
 
 ### S0 Gate
 

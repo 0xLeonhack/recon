@@ -18,6 +18,8 @@
     "contracts:compile": "hardhat compile",
     "vault:deploy": "hardhat run scripts/deploy-vault.ts --network hederaTestnet",
     "topic:create": "tsx scripts/create-topic.ts",
+    "api:start": "tsx scripts/serve-api.ts",
+    "run:live": "tsx scripts/run-live.ts",
     "demo:verify": "tsx scripts/verify-demo.ts",
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "probe:blocky402": "tsx scripts/probe-blocky402.ts",

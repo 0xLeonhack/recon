@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
+
 import { keccak256, toBytes } from 'viem';
 
 import {
@@ -31,6 +34,8 @@ function requireEnv(name: string): string {
   }
   return value.trim();
 }
+
+loadEnvFile(resolve('.env'));
 
 const forged = process.argv.includes('--forged');
 const correlationId = process.env.RECON_CORRELATION_ID ?? `live-${Date.now()}`;
@@ -129,7 +134,7 @@ async function runPaidVerify(
     throw new Error(`expected 402 for unpaid verify-query, got ${unpaid.status}`);
   }
   const requirementBody = (await unpaid.json()) as {
-    accepts?: ReadonlyArray<{ maxAmountRequired?: string; asset?: string }>;
+    accepts?: ReadonlyArray<{ amount?: string; asset?: string }>;
   };
   const requirement = requirementBody.accepts?.[0];
   console.error(`[run-live] 402 received: ${JSON.stringify(requirement)}`);
@@ -182,8 +187,8 @@ async function runPaidVerify(
       payloadHash: hashCanonicalJson({ service: 'verify-query' }),
       evidence: {
         facilitator: 'blocky402',
-        asset: requirement?.asset ?? 'HBAR',
-        amountTinybar: requirement?.maxAmountRequired ?? 'unknown',
+        asset: requirement?.asset ?? '0.0.0',
+        amountTinybar: requirement?.amount ?? 'unknown',
         settlementRef: result.settlementRef ?? 'missing',
         verificationStatus: result.status ?? 'unknown',
       },
@@ -275,27 +280,31 @@ async function main(): Promise<void> {
     operatorId: agentAccountId,
     operatorKey: agentKey,
   });
-  const submit = createSdkSubmitter(client, topicId);
-  const published: Array<{ eventId: string; sequenceNumber: number }> = [];
-  for (const event of [queryEvent, payment.event, proposed, executed]) {
-    const result = await publishEvidenceEvent(topicId, event, submit);
-    published.push({ eventId: event.eventId, sequenceNumber: result.sequenceNumber });
-  }
+  try {
+    const submit = createSdkSubmitter(client, topicId);
+    const published: Array<{ eventId: string; sequenceNumber: number }> = [];
+    for (const event of [queryEvent, payment.event, proposed, executed]) {
+      const result = await publishEvidenceEvent(topicId, event, submit);
+      published.push({ eventId: event.eventId, sequenceNumber: result.sequenceNumber });
+    }
 
-  console.log(
-    JSON.stringify(
-      {
-        status: 'VERIFIED',
-        correlationId,
-        forged,
-        timeline: published,
-        vault: { address: vaultAddress, txHash: executed.evidence.transactionId },
-        settlementRef: payment.event.evidence.settlementRef,
-      },
-      null,
-      2,
-    ),
-  );
+    console.log(
+      JSON.stringify(
+        {
+          status: 'VERIFIED',
+          correlationId,
+          forged,
+          timeline: published,
+          vault: { address: vaultAddress, txHash: executed.evidence.transactionId },
+          settlementRef: payment.event.evidence.settlementRef,
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    client.close();
+  }
 }
 
 main().catch((error: unknown) => {

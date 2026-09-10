@@ -74,7 +74,7 @@ async function probeService402(feePayer?: string): Promise<ProbePart> {
         httpStatus: response.status,
         payTo: requirement.payTo,
         asset: requirement.asset,
-        maxAmountRequired: requirement.maxAmountRequired,
+        amount: requirement.amount,
         scheme: requirement.scheme,
         network: requirement.network,
         x402Version: requirement.x402Version,

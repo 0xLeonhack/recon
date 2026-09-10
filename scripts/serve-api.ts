@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
+
 import { discoverHederaX402Support } from '../src/adapters/blocky402';
 import { startVerifyQueryServer } from '../src/api/server';
 import { VERIFY_QUERY_PRICE_TINYBAR_DEFAULT } from '../src/api/verify-query';
@@ -10,6 +13,8 @@ function requireEnv(name: string): string {
   }
   return value.trim();
 }
+
+loadEnvFile(resolve('.env'));
 
 const payTo = requireEnv('X402_VERIFY_PAYTO');
 const facilitatorBaseUrl = process.env.BLOCKY402_BASE_URL ?? 'https://api.testnet.blocky402.com';

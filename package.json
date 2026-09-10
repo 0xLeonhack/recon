@@ -23,6 +23,7 @@
     "topic:create": "tsx scripts/create-topic.ts",
     "api:start": "tsx scripts/serve-api.ts",
     "run:live": "tsx scripts/run-live.ts",
+    "pay:header": "tsx scripts/generate-payment-header.ts",
     "demo:verify": "tsx scripts/verify-demo.ts",
     "demo:verify:forged": "tsx scripts/verify-demo.ts --forged",
     "verify:live": "tsx scripts/verify-live.ts",

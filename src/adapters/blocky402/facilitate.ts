@@ -14,6 +14,7 @@ const SettleResponseSchema = z
     error: z.string().optional(),
     transactionId: z.string().optional(),
     txHash: z.string().optional(),
+    transaction: z.string().optional(),
     network: z.string().optional(),
   })
   .passthrough();
@@ -24,10 +25,10 @@ export interface PaymentRequirements {
   readonly x402Version: 2;
   /** Hedera account id that receives the payment. */
   readonly payTo: string;
-  /** Asset identifier passed through to the facilitator, e.g. `HBAR`. */
+  /** Asset identifier passed through to the facilitator, e.g. `0.0.0` for HBAR. */
   readonly asset: string;
-  /** Maximum amount in the asset's smallest unit, serialized as a string. */
-  readonly maxAmountRequired: string;
+  /** Amount in the asset's smallest unit, serialized as a string. */
+  readonly amount: string;
   /** Resource URL the payment unlocks. */
   readonly resource: string;
   readonly maxTimeoutSeconds: number;
@@ -140,7 +141,7 @@ export async function settlePayment(
   if (!parsed.data.success) {
     throw new BlockyFacilitateError('PAYMENT_REJECTED');
   }
-  const settlementRef = parsed.data.transactionId ?? parsed.data.txHash;
+  const settlementRef = parsed.data.transactionId ?? parsed.data.txHash ?? parsed.data.transaction;
   if (settlementRef === undefined || settlementRef.trim().length === 0) {
     throw new BlockyFacilitateError('INVALID_RESPONSE');
   }

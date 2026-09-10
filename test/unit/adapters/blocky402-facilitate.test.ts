@@ -12,8 +12,8 @@ const requirements: PaymentRequirements = Object.freeze({
   network: 'hedera:testnet',
   x402Version: 2,
   payTo: '0.0.7162784',
-  asset: 'HBAR',
-  maxAmountRequired: '10000000',
+  asset: '0.0.0',
+  amount: '10000000',
   resource: 'https://recon.example/verify-query',
   maxTimeoutSeconds: 60,
 });
@@ -129,6 +129,25 @@ describe('settlePayment', () => {
         fetchImpl,
       ),
     ).resolves.toEqual({ settlementRef: '0xabc123' });
+  });
+
+  it('reads the facilitator `transaction` field as the settlement reference', async () => {
+    const fetchImpl = postResponder(200, {
+      success: true,
+      transaction: '0.0.7162784@1789041479.002716789',
+      network: 'hedera:testnet',
+    });
+
+    await expect(
+      settlePayment(
+        'https://facilitator.example',
+        { paymentHeader: 'header', requirements },
+        fetchImpl,
+      ),
+    ).resolves.toEqual({
+      settlementRef: '0.0.7162784@1789041479.002716789',
+      network: 'hedera:testnet',
+    });
   });
 
   it('maps failed settlement to PAYMENT_REJECTED', async () => {

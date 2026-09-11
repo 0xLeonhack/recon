@@ -9,6 +9,7 @@ import {
   type DemoActions,
   type RunningDemoController,
 } from '../../../src/api/demo-controller';
+import { RunLiveError } from '../../../src/demo';
 
 const actions = {
   mandate: vi.fn(),
@@ -16,6 +17,7 @@ const actions = {
   verify: vi.fn(),
   slash: vi.fn(),
   kill: vi.fn(),
+  progress: vi.fn(),
 };
 
 let server: RunningDemoController;
@@ -30,6 +32,7 @@ beforeEach(async () => {
   actions.verify.mockResolvedValue({ correlationId: 'live-1', report: { status: 'VERIFIED' } });
   actions.slash.mockResolvedValue({ correlationId: 'live-1', stakeAfter: '0' });
   actions.kill.mockResolvedValue({ vaultStateAfter: { status: 'Frozen' } });
+  actions.progress.mockReturnValue(null);
 
   server = await startDemoController({
     actions: actions as unknown as DemoActions,
@@ -112,6 +115,30 @@ describe('startDemoController', () => {
     const response = await fetch(`${server.url}/api/kill`, { method: 'POST' });
     expect(response.status).toBe(200);
     expect(actions.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces run rejection codes instead of a generic 500', async () => {
+    actions.run.mockRejectedValueOnce(new RunLiveError('VAULT_REJECTED_NotActive'));
+    const response = await fetch(`${server.url}/api/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'normal' }),
+    });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: 'VAULT_REJECTED_NotActive' });
+  });
+
+  it('reports null run progress before a run', async () => {
+    const response = await fetch(`${server.url}/api/run/progress`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ stage: null });
+  });
+
+  it('reports the current run progress', async () => {
+    actions.progress.mockReturnValue({ stage: 'RATIONALE' });
+    const response = await fetch(`${server.url}/api/run/progress`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ stage: 'RATIONALE' });
   });
 
   it('returns 404 for unknown API routes', async () => {

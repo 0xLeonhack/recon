@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ApiError,
   fetchMandate,
+  fetchRunProgress,
   killVault,
   runDemo,
   slashDemo,
@@ -11,6 +12,8 @@ import {
   type KillResult,
   type LiveSnapshot,
   type MandatePayload,
+  type RunProgress,
+  type RunStage,
   type SlashResult,
 } from './api';
 
@@ -58,6 +61,24 @@ const timelineLabels: Readonly<Record<EvidenceEventType, string>> = {
   ACTION_EXECUTED: 'Executed',
 };
 
+const RUN_STAGES: readonly RunStage[] = [
+  'DATA_QUERY',
+  'API_PAYMENT',
+  'RATIONALE',
+  'ACTION_EXECUTED',
+  'PUBLISHED',
+  'VERIFYING',
+];
+
+const STAGE_LABELS: Readonly<Record<RunStage, string>> = {
+  DATA_QUERY: 'Graph query',
+  API_PAYMENT: 'Payment',
+  RATIONALE: 'Rationale',
+  ACTION_EXECUTED: 'Vault execute',
+  PUBLISHED: 'Evidence',
+  VERIFYING: 'Verify',
+};
+
 function formatDeadline(unixSeconds: string): string {
   const numeric = Number(unixSeconds);
   if (!Number.isFinite(numeric)) return unixSeconds;
@@ -77,6 +98,8 @@ export function App() {
   const [slashResult, setSlashResult] = useState<SlashResult | null>(null);
   const [killResult, setKillResult] = useState<KillResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<RunProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,9 +115,19 @@ export function App() {
 
   async function handleRun() {
     setBusy(true);
+    setRunning(true);
     setError(null);
     setSlashResult(null);
     setKillResult(null);
+    setSnapshot(null);
+    setProgress(null);
+
+    const poll = window.setInterval(() => {
+      void fetchRunProgress()
+        .then(setProgress)
+        .catch(() => {});
+    }, 500);
+
     try {
       const result = await runDemo(mode);
       setSnapshot(result);
@@ -102,6 +135,9 @@ export function App() {
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      window.clearInterval(poll);
+      setProgress(null);
+      setRunning(false);
       setBusy(false);
     }
   }
@@ -133,6 +169,8 @@ export function App() {
 
   const verifiedCount =
     snapshot?.report.findings.filter((finding) => finding.status === 'VERIFIED').length ?? 0;
+  const progressStage: RunStage = progress?.stage ?? 'DATA_QUERY';
+  const currentStepIndex = RUN_STAGES.indexOf(progressStage);
 
   return (
     <main className={`app app--${(snapshot?.report.status ?? 'pending').toLowerCase()}`}>
@@ -215,6 +253,40 @@ export function App() {
             </button>
           </div>
         </section>
+
+        {running && (
+          <section className="progress" aria-label="Run progress" aria-live="polite">
+            <header className="progress-head">
+              <div>
+                <p className="kicker">Live pipeline</p>
+                <h2>{STAGE_LABELS[progressStage]}</h2>
+              </div>
+              <span>
+                {currentStepIndex + 1} / {RUN_STAGES.length}
+              </span>
+            </header>
+            <ol className="progress-track">
+              {RUN_STAGES.map((stage, index) => {
+                const state =
+                  index < currentStepIndex
+                    ? 'is-done'
+                    : index === currentStepIndex
+                      ? 'is-active'
+                      : 'is-pending';
+                return (
+                  <li
+                    key={stage}
+                    className={state}
+                    aria-current={index === currentStepIndex ? 'step' : undefined}
+                  >
+                    <span className="progress-node">{(index + 1).toString().padStart(2, '0')}</span>
+                    <span>{STAGE_LABELS[stage]}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        )}
 
         {error !== null && (
           <section className="banner banner--error" role="alert">

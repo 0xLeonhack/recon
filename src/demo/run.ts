@@ -27,6 +27,13 @@ import { createPaymentHeader } from './payment';
 
 export type DemoMode = 'normal' | 'forged';
 
+export class RunLiveError extends Error {
+  constructor(readonly code: string) {
+    super(`Live run failed (${code})`);
+    this.name = 'RunLiveError';
+  }
+}
+
 export interface RunLiveOptions {
   readonly mode: DemoMode;
   readonly correlationId?: string;
@@ -127,7 +134,7 @@ async function runPaidVerify(
   // 1. Unpaid request: the handler must answer with the 402 requirement set.
   const unpaid = await handleVerifyQuery({ headers: {}, body: verifyBody });
   if (unpaid.status !== 402) {
-    throw new Error(`expected 402 for unpaid verify-query, got ${unpaid.status}`);
+    throw new RunLiveError('UNEXPECTED_402_RESPONSE');
   }
   const requirement = (
     unpaid.body as {
@@ -149,7 +156,7 @@ async function runPaidVerify(
     body: verifyBody,
   });
   if (paid.status !== 200) {
-    throw new Error(`paid verify failed with ${paid.status}`);
+    throw new RunLiveError('PAID_VERIFY_FAILED');
   }
   const result = paid.body as { status?: string; settlementRef?: string };
   const verificationStatus =
@@ -158,7 +165,7 @@ async function runPaidVerify(
       : result.status === 'MISMATCH'
         ? 'MISMATCH'
         : undefined;
-  if (verificationStatus === undefined) throw new Error('paid verify returned an invalid status');
+  if (verificationStatus === undefined) throw new RunLiveError('PAID_VERIFY_INVALID_STATUS');
 
   return {
     status: verificationStatus,
@@ -203,7 +210,7 @@ async function runAgentDecision(
     policyDecision: policy.decision,
   });
   assertToolMatchesPolicy(decision.tool, policy.decision, payment.status);
-  if (decision.tool !== 'EXECUTE_VAULT') throw new Error('AGENT_POLICY_HOLD');
+  if (decision.tool !== 'EXECUTE_VAULT') throw new RunLiveError('AGENT_POLICY_HOLD');
 
   return {
     schemaVersion: '1',
@@ -238,7 +245,7 @@ async function runVaultAction(
   verifiedResponseHash: Sha256Hash,
 ): Promise<{ proposed: EvidenceEvent; executed: EvidenceEvent }> {
   const settlementRef = paymentEvent.evidence.settlementRef;
-  if (settlementRef === undefined) throw new Error('API_PAYMENT evidence lacks settlementRef');
+  if (settlementRef === undefined) throw new RunLiveError('PAYMENT_EVIDENCE_INCOMPLETE');
 
   const actionPayload = {
     correlationId,
@@ -281,7 +288,7 @@ async function runVaultAction(
   );
 
   if (!result.executed) {
-    throw new Error(`REJECTED: ${result.rejectionReason ?? 'UNKNOWN'}`);
+    throw new RunLiveError(`VAULT_REJECTED_${result.rejectionReason ?? 'UNKNOWN'}`);
   }
 
   const executed: EvidenceEvent = {

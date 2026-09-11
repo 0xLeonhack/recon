@@ -29,15 +29,33 @@ export interface MandatePayload {
   readonly recipientAllowed: boolean;
 }
 
+export const RUN_STAGES = [
+  'DATA_QUERY',
+  'API_PAYMENT',
+  'RATIONALE',
+  'ACTION_EXECUTED',
+  'PUBLISHED',
+  'VERIFYING',
+] as const;
+
+export type RunStage = (typeof RUN_STAGES)[number];
+
+export interface RunProgress {
+  readonly stage: RunStage;
+}
+
 export interface DemoActions {
   mandate(): Promise<MandatePayload>;
   run(mode: DemoMode): Promise<LiveSnapshot>;
   verify(correlationId: string): Promise<LiveSnapshot>;
   slash(correlationId: string): Promise<SlashResult>;
   kill(): Promise<KillResult>;
+  progress(): RunProgress | null;
 }
 
 export function createDemoActions(config: DemoConfig): DemoActions {
+  let currentProgress: RunProgress | null = null;
+
   return {
     async mandate(): Promise<MandatePayload> {
       const publicClient = createVaultPublicClient(config.rpcUrl);
@@ -65,13 +83,22 @@ export function createDemoActions(config: DemoConfig): DemoActions {
     },
 
     async run(mode: DemoMode): Promise<LiveSnapshot> {
-      const { correlationId } = await runLive(config, { mode });
+      currentProgress = { stage: 'DATA_QUERY' };
+      const { correlationId } = await runLive(config, {
+        mode,
+        onProgress: (step) => {
+          currentProgress = { stage: step as RunStage };
+        },
+      });
+      currentProgress = { stage: 'VERIFYING' };
       // The mirror node needs a few seconds to index the fresh HCS messages.
       const deadline = Date.now() + 30_000;
       let lastError: LiveVerifyError | undefined;
       while (Date.now() < deadline) {
         try {
-          return await verifyLive(config, correlationId);
+          const snapshot = await verifyLive(config, correlationId);
+          currentProgress = null;
+          return snapshot;
         } catch (error) {
           if (
             error instanceof LiveVerifyError &&
@@ -85,6 +112,10 @@ export function createDemoActions(config: DemoConfig): DemoActions {
         }
       }
       throw lastError ?? new LiveVerifyError('VERIFICATION_TIMEOUT');
+    },
+
+    progress(): RunProgress | null {
+      return currentProgress;
     },
 
     async verify(correlationId: string): Promise<LiveSnapshot> {
@@ -267,6 +298,10 @@ async function handleApi(
       const body = (await readJsonBody(request)) as { mode?: string } | undefined;
       const mode: DemoMode = body?.mode === 'forged' ? 'forged' : 'normal';
       sendJson(response, 200, await actions.run(mode));
+      return;
+    }
+    if (request.method === 'GET' && pathname === '/api/run/progress') {
+      sendJson(response, 200, { stage: actions.progress()?.stage ?? null });
       return;
     }
     if (request.method === 'POST' && pathname === '/api/verify') {

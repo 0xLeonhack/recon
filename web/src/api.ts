@@ -1,5 +1,12 @@
 export type DemoMode = 'normal' | 'forged';
 
+export type RunStage =
+  'DATA_QUERY' | 'API_PAYMENT' | 'RATIONALE' | 'ACTION_EXECUTED' | 'PUBLISHED' | 'VERIFYING';
+
+export interface RunProgress {
+  readonly stage: RunStage | null;
+}
+
 export type EvidenceEventType =
   'DATA_QUERY' | 'API_PAYMENT' | 'RATIONALE' | 'ACTION_PROPOSED' | 'ACTION_EXECUTED';
 
@@ -146,4 +153,8 @@ export function slashDemo(correlationId: string): Promise<SlashResult> {
 
 export function killVault(): Promise<KillResult> {
   return request<KillResult>('/api/kill', { method: 'POST' });
+}
+
+export function fetchRunProgress(): Promise<RunProgress> {
+  return request<RunProgress>('/api/run/progress');
 }

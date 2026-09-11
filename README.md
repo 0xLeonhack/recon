@@ -147,13 +147,13 @@ Live instance used by the demo (all values public — no keys in this repository
 
 | Item | Value |
 |---|---|
-| Network | Hedera testnet · chain ID 296 · [HashScan](https://hashscan.io/testnet/contract/0xdaa51afcc574c163dd147127567dabc7847bf953) |
-| `PolicyVault` | [`0xdaa51afcc574c163dd147127567dabc7847bf953`](https://hashscan.io/testnet/contract/0xdaa51afcc574c163dd147127567dabc7847bf953) — Active, budget cap 20 HBAR, deadline 2026-09-30 |
+| Network | Hedera testnet · chain ID 296 · [HashScan](https://hashscan.io/testnet/contract/0xf538cd7c65bfcbe23f3c4f2655fd422c77ba3165) |
+| `PolicyVault` | [`0xf538cd7c65bfcbe23f3c4f2655fd422c77ba3165`](https://hashscan.io/testnet/contract/0xf538cd7c65bfcbe23f3c4f2655fd422c77ba3165) — Active, budget cap 20 HBAR, deadline 2026-09-30 |
 | HCS evidence topic | [`0.0.10456868`](https://hashscan.io/testnet/topic/0.0.10456868) |
-| Vault principal | funded 20 HBAR — tx [`0x5bf6271f…fb20ce6e`](https://hashscan.io/testnet/transaction/0x5bf6271fce1edaef80305728dc57c99726584122927798680d9600f9fb20ce6e) |
-| Operator stake | funded 10 HBAR — tx [`0x9f4e0abb…6d420b94`](https://hashscan.io/testnet/transaction/0x9f4e0abbba5782a6ac385a0916f22ed27607ff6915d4d7339018e0ff6d420b94) |
+| Vault principal | funded 20 HBAR — tx [`0xb4817832…357c162f`](https://hashscan.io/testnet/transaction/0xb48178327c4a011be0ac516e2aa5e868ffb1411a5c9ad4f95c49d832357c162f) |
+| Operator stake | funded 10 HBAR — tx [`0x960af0de…16b898a9`](https://hashscan.io/testnet/transaction/0x960af0de29022a16b7f4806273893bd1e6bec39afc0822b39748a71116b898a9) |
 | Pinned Graph target | official Uniswap V3 deployment `QmTZ8ejXJxRo7vDBS4uwqBeGoxLSWbhaA7oXa1RvxunLy7`, Ethereum mainnet block `25946145`; double-replay hash `0x41f0335a…4f2f71e72` (matched twice) |
-| Latest fully verified run | correlation `live-1789122096033`; R1-R5 `VERIFIED`; vault tx [`0xa8d3fdd4…9da94d1f`](https://hashscan.io/testnet/transaction/0xa8d3fdd4618ee2a51087d5e0017c4db1c051cb4f4972dec800fdca579da94d1f); settlement [`0.0.7162784@1789122091.332398197`](https://hashscan.io/testnet/transaction/0.0.7162784-1789122091-332398197) |
+| Latest fully verified run | correlation `live-1789126008352`; R1-R5 `VERIFIED`; vault tx [`0xf1b7e011…b10edc8`](https://hashscan.io/testnet/transaction/0xf1b7e0110c51cd6a82cce56a3c9baa6716c8bc547d11ff4490cb3aaf9b10edc8); settlement [`0.0.7162784@1789126003.965804578`](https://hashscan.io/testnet/transaction/0.0.7162784-1789126003-965804578) |
 
 ## Status — what is proven vs in progress
 

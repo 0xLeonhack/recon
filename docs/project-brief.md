@@ -38,11 +38,11 @@ RECON 的产品本体是委托对账，不是另一个 agent 钱包。
 
 ### 用户如何使用
 
-1. 用户连接浏览器钱包并切换到 Hedera testnet。
-2. 用户填写 HBAR 总预算、白名单收款方和截止时间，用钱包签署 PolicyVault 部署与注资。
-3. 用户点击 Run Agent；服务端受限 agent 完成 live Graph 查询、x402 程序化付款、vault 动作和 HCS 发布，页面显示实时步骤状态。
+1. 用户连接预部署 Vault 的 owner 浏览器钱包，并打开 `Prepared testnet vault`。
+2. Web 从 Hedera testnet 读取真实预算、白名单、截止时间、principal、operator stake 和部署/注资交易；不是预置 JSON。
+3. 用户点击 Run Agent；服务端受限 agent 完成 live Graph 查询、真实 x402 付款、vault 动作和 HCS 发布，页面显示实时步骤状态。
 4. Web 自动按 correlation ID 运行共享 verifier，展示三栏对账、R1-R5 和可点击原始证据；CLI 可独立得到同一结果。
-5. 异常记录可请求受信任 verifier 裁决；用户仍由自己的钱包触发 kill-switch，服务端不持有 owner 密钥。
+5. 异常记录可请求受信任 verifier 裁决；用户由 owner 钱包签署 kill-switch，服务端不持有 owner 密钥。
 
 ### 可信边界
 
@@ -56,11 +56,13 @@ RECON 的产品本体是委托对账，不是另一个 agent 钱包。
 
 ## Demo 三幕（用户视角）
 
-1. **设置委托**：从全新浏览器会话连接钱包，在 Web 填写总预算、白名单收款方和截止时间；用户签署部署与注资交易。
+1. **打开委托**：从全新浏览器会话连接 owner 钱包；Web 读取已真实部署和注资的 testnet Vault，展示 mandate 与原始交易。
 2. **正常执行**：用户点击 Run Agent；页面实时展示 live Graph 查询、Hedera x402 付款、PolicyVault 执行和 HCS 发布，同一个 correlation ID 的验证结果为 VERIFIED。
 3. **对账与处置**：用户启动明确标识的 adversarial run；伪造 response hash 被标为 MISMATCH，随后从 Web 请求 verifier 裁决并看到相同 evidence hash 的罚没交易。用户用钱包触发 kill-switch，后续动作被链上拒绝。
 
 视频主流程不打开终端、不使用 fixture；CLI 只在结尾证明同一 correlation ID 可以脱离 Web 独立复验。
+
+为保证两日内交付，Demo 使用一次性预部署 Vault，不提供任意用户自助部署与注资。所有展示数据仍来自真实外部系统；这是范围收缩，不是 mock。
 
 ---
 
@@ -92,4 +94,4 @@ RECON 的产品本体是委托对账，不是另一个 agent 钱包。
 - 本系统不证明 agent 的内部推理，也不审计 agent 自有账户的全部行为。
 - 外部服务不可用时显示 UNVERIFIABLE，不把它误判为通过或作弊。
 - 当前仓库中的 `LOCAL_FIXTURE` 页面只是开发夹具，不能作为“用户已可使用”或实网赛道证据。
-- 视频控制在 3-4 分钟，从用户连接钱包开始，完整展示真实委托、live 数据、真实付款、对账、作弊检测和处置。
+- 视频控制在 3-4 分钟，从用户连接 owner 钱包和打开真实委托开始，完整展示 live 数据、真实付款、对账、作弊检测和处置。

@@ -1,6 +1,6 @@
 # RECON - 功能、流程与演示重点
 
-> 配合 project-brief.md 使用。本文只保留已经进入 v1.2 PRD 的功能与讲稿口径。
+> 配合 project-brief.md 使用。本文只保留已经进入 v1.3 PRD 的功能与讲稿口径。
 
 ---
 
@@ -8,8 +8,8 @@
 
 | # | 功能 | 一句话 |
 |---|---|---|
-| 1 | 用户工作台 | 用户在 Web 连接钱包，完成委托、运行、验证和处置，不依赖终端 |
-| 2 | 单资产策略金库 | 用户用钱包签署部署与注资；合约在执行时检查总预算、白名单和截止时间 |
+| 1 | 用户工作台 | 用户在 Web 打开真实预部署委托，完成运行、验证和处置，不依赖终端 |
+| 2 | 单资产策略金库 | Web 从链上读取真实部署与注资状态；合约在执行时检查总预算、白名单和截止时间 |
 | 3 | 受限执行 agent | agent 有 gas 与受限 signer，但没有 owner/admin 权限，不能绕过 vault 动用金库资产 |
 | 4 | 三方自动对账 | 同屏比较 claimed / actual / allowed，不一致时给出明确原因和原始证据 |
 | 5 | 独立重放验证 | 固定 Graph deployment 和最终区块，Web 与 CLI 复用同一个验证核心 |
@@ -25,15 +25,14 @@
 ```text
 1. Connect
    浏览器钱包 -> Hedera testnet (chain ID 296)
-   -> 签名短时会话
-   -> Web 确认 owner 地址、余额与服务状态
+   -> 确认连接地址是预部署 Vault owner
+   -> Web 确认服务状态
 
-2. Mandate
-   用户填写总预算、白名单收款方、截止时间
-   -> 查看固定 agent/operator/verifier/beneficiary 角色
-   -> 钱包签署 PolicyVault 部署
-   -> 钱包签署 HBAR 注资
-   -> operator 存入独立 stake
+2. Open live mandate
+   Web 从 Hedera testnet 读取预部署 PolicyVault
+   -> 展示总预算、白名单收款方、截止时间与固定角色
+   -> 展示 principal 与 operator stake
+   -> 展示部署、注资和 stake 的真实交易链接
 
 3. Run
    用户点击 Run Agent
@@ -85,15 +84,17 @@
 ## 3-4 分钟视频顺序
 
 1. 15 秒：一句话问题；立即进入工作台，不展示 landing page。
-2. 35 秒：从未连接状态开始，连接钱包并确认 Hedera testnet；填写 mandate，签署部署与注资。
+2. 25 秒：从未连接状态开始，连接 owner 钱包；打开真实预部署 Vault，展示链上 mandate、principal、stake 与交易链接。
 3. 55 秒：点击 Run Agent；页面实时走过 Graph 查询、x402 付款、vault 执行与 HCS 发布。
 4. 30 秒：同一页面自动显示 VERIFIED 三栏对账、R1-R5 与真实证据链接。
 5. 40 秒：启动 adversarial run；展示 forged hash 与重放 hash 不一致、状态变为 MISMATCH。
 6. 35 秒：请求 verifier 裁决；展示相同 evidence hash、真实 slash 交易和 operator stake 变化。
 7. 25 秒：用户钱包签署 kill-switch；下一次 agent 动作显示 REJECTED / NotActive。
-8. 20 秒：用 CLI 重验同一 correlation ID，并收束三个赞助商的具体证据。
+8. 15 秒：用 CLI 重验同一 correlation ID，并收束已有真实赞助商证据；未完成的 Bazantic 不进入声明。
 
 录制规则：所有主流程动作从 Web 发起；可剪去 testnet 等待时间，但不能用 fixture、预置成功状态或终端脚本替代交易。钱包弹窗、交易 hash、网络标识和关键状态变化必须入镜。
+
+范围披露：Demo 使用一次性预部署并注资的 testnet Vault。用户自助创建 Vault、多租户账户系统和公网写操作 API 不在两日交付范围；这不改变运行、付款、验证和处置数据必须全部真实的要求。
 
 ---
 

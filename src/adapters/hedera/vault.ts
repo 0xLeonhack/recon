@@ -185,6 +185,14 @@ export function decodeVaultLog(
   return undefined;
 }
 
+/**
+ * Hedera's public JSON-RPC relay rejects an eth_getLogs range whose block
+ * timestamps span more than 7 days (error -32004), so the scan is split into
+ * bounded windows. 50k blocks is ~1 day at Hedera's ~2s block time — well
+ * inside the cap even if the chain ever sped up.
+ */
+const MAX_BLOCKS_PER_LOG_QUERY = 50_000n;
+
 export async function readVaultActions(
   publicClient: PublicClient,
   vaultAddress: string,
@@ -192,33 +200,38 @@ export async function readVaultActions(
 ): Promise<readonly VaultActionEvent[]> {
   const address = requireAddress(vaultAddress, 'INVALID_ADDRESS');
   const abi = loadVaultAbi();
-
-  const [executedLogs, rejectedLogs] = await Promise.all([
-    publicClient.getContractEvents({
-      address,
-      abi,
-      eventName: 'ActionExecuted',
-      fromBlock: options.fromBlock,
-      toBlock: options.toBlock,
-    }),
-    publicClient.getContractEvents({
-      address,
-      abi,
-      eventName: 'ActionRejected',
-      fromBlock: options.fromBlock,
-      toBlock: options.toBlock,
-    }),
-  ]);
-  const logs = [...executedLogs, ...rejectedLogs];
+  const toBlock = options.toBlock ?? (await publicClient.getBlockNumber());
 
   const events: VaultActionEvent[] = [];
-  for (const log of logs) {
-    const decoded = decodeVaultLog(
-      { topics: log.topics, data: log.data, blockNumber: log.blockNumber },
-      log.transactionHash ?? '',
-      log.logIndex ?? 0,
-    );
-    if (decoded !== undefined) events.push(decoded);
+  for (let start = options.fromBlock; start <= toBlock; start += MAX_BLOCKS_PER_LOG_QUERY) {
+    const windowEnd = start + MAX_BLOCKS_PER_LOG_QUERY - 1n;
+    const end = windowEnd < toBlock ? windowEnd : toBlock;
+
+    const [executedLogs, rejectedLogs] = await Promise.all([
+      publicClient.getContractEvents({
+        address,
+        abi,
+        eventName: 'ActionExecuted',
+        fromBlock: start,
+        toBlock: end,
+      }),
+      publicClient.getContractEvents({
+        address,
+        abi,
+        eventName: 'ActionRejected',
+        fromBlock: start,
+        toBlock: end,
+      }),
+    ]);
+
+    for (const log of [...executedLogs, ...rejectedLogs]) {
+      const decoded = decodeVaultLog(
+        { topics: log.topics, data: log.data, blockNumber: log.blockNumber },
+        log.transactionHash ?? '',
+        log.logIndex ?? 0,
+      );
+      if (decoded !== undefined) events.push(decoded);
+    }
   }
   return events;
 }

@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
+
 import {
   createVaultPublicClient,
   readVaultActions,
@@ -27,6 +30,14 @@ import { DEFAULT_HEDERA_TESTNET_RPC_URL } from '../src/adapters/hedera';
  *   Exit codes: 0 VERIFIED · 1 UNVERIFIABLE/missing · 2 MISMATCH.
  */
 
+try {
+  loadEnvFile(resolve('.env'));
+} catch {
+  // No .env file — rely on the ambient environment (matches the other CLIs).
+}
+
+const DEFAULT_MIRROR_NODE_URL = 'https://testnet.mirrornode.hedera.com';
+
 const correlationId = process.argv.find((arg, index) => index > 1 && !arg.startsWith('--')) ?? '';
 const rpcUrl = process.env.HEDERA_RPC_URL ?? DEFAULT_HEDERA_TESTNET_RPC_URL;
 
@@ -43,6 +54,37 @@ function compareVaultEvents(
     return left.blockNumber < right.blockNumber ? -1 : 1;
   }
   return left.logIndex - right.logIndex;
+}
+
+/**
+ * The vault cannot have emitted events before it was deployed, so start the
+ * log scan there instead of genesis (Hashio rejects a >7-day getLogs span).
+ * `VAULT_DEPLOY_BLOCK` overrides the mirror-node lookup.
+ */
+async function resolveVaultDeployBlock(): Promise<bigint> {
+  const override = process.env.VAULT_DEPLOY_BLOCK?.trim();
+  if (override !== undefined && override.length > 0) return BigInt(override);
+
+  const mirrorBaseUrl = process.env.HEDERA_MIRROR_NODE_URL ?? DEFAULT_MIRROR_NODE_URL;
+  const contractResponse = await fetch(
+    new URL(`/api/v1/contracts/${vaultAddress}`, mirrorBaseUrl),
+    { signal: AbortSignal.timeout(15_000) },
+  );
+  if (!contractResponse.ok) throw new Error(`contract lookup ${contractResponse.status}`);
+  const contract = (await contractResponse.json()) as { created_timestamp?: string };
+  const createdTimestamp = contract.created_timestamp;
+  if (createdTimestamp === undefined) throw new Error('created_timestamp missing');
+
+  const blocksUrl = new URL('/api/v1/blocks', mirrorBaseUrl);
+  blocksUrl.searchParams.set('timestamp', `gte:${createdTimestamp}`);
+  blocksUrl.searchParams.set('limit', '1');
+  blocksUrl.searchParams.set('order', 'asc');
+  const blocksResponse = await fetch(blocksUrl, { signal: AbortSignal.timeout(15_000) });
+  if (!blocksResponse.ok) throw new Error(`block lookup ${blocksResponse.status}`);
+  const blocks = (await blocksResponse.json()) as { blocks?: Array<{ number?: number }> };
+  const blockNumber = blocks.blocks?.[0]?.number;
+  if (blockNumber === undefined) throw new Error('block number missing');
+  return BigInt(blockNumber);
 }
 
 if (correlationId.trim().length === 0 || correlationId.startsWith('--')) {
@@ -123,7 +165,19 @@ findings.push(verifyCorrelationTimeline(timeline));
 
 const publicClient = createVaultPublicClient(rpcUrl);
 const vaultState = await readVaultState(publicClient, vaultAddress);
-const vaultEvents = await readVaultActions(publicClient, vaultAddress, { fromBlock: 0n });
+
+let fromBlock = 0n;
+try {
+  fromBlock = await resolveVaultDeployBlock();
+  console.error(`[verify-live] scanning vault logs from block ${fromBlock}`);
+} catch (error) {
+  console.error(
+    `[verify-live] vault deploy block unavailable (${
+      error instanceof Error ? error.message : 'unknown'
+    }); scanning in bounded chunks from genesis`,
+  );
+}
+const vaultEvents = await readVaultActions(publicClient, vaultAddress, { fromBlock });
 
 const executedEvents = timeline.filter((event) => event.type === 'ACTION_EXECUTED');
 

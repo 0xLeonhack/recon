@@ -92,7 +92,7 @@ npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, sla
 | `GRAPH_API_KEY`, `GRAPH_DEPLOYMENT_ID`, `GRAPH_FINAL_BLOCK_NUMBER` | API key from [thegraph.com](https://thegraph.com) dashboard; deployment ID of the subgraph to pin (we verified against the official Uniswap V3 deployment); a block number already indexed by that deployment. |
 | `X402_VERIFY_PAYTO`, `X402_VERIFY_PRICE_TINYBAR` | Your EVM address receiving API payments; price in tinybar (default `10000000` = 0.1 HBAR). |
 
-> **Note:** the live demo scripts (`api:start`, `pay:header`, `run:live`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. The demo assumes values in Hedera's relay semantics: `msg.value`-style amounts (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar; calldata-style amounts (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
+> **Note:** the live demo scripts (`api:start`, `pay:header`, `run:live`, `verify:live`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. `verify:live` starts its vault log scan at the vault's deploy block (resolved from the mirror node, or `VAULT_DEPLOY_BLOCK` if set) — the public relay rejects any wider `eth_getLogs` span. The demo assumes values in Hedera's relay semantics: `msg.value`-style amounts (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar; calldata-style amounts (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
 
 Verify a correlation end-to-end (reconciliation core, deterministic):
 

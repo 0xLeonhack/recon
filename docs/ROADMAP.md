@@ -26,7 +26,7 @@
 | S0 | 工程骨架与核心真实性 Gate | 进行中 | Hedera/Graph/x402/R1-R5 核心 Gate 已用 `live-1789115733718` 全绿通过；Bazantic 独立 Gate 未完成 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 进行中 | Evidence/Verification v1 与 canonicalization 有实现和单测（`fb9a9f7`-`96d1a8c`）；PolicyVault v1 接口落地（`c8f4092`）。冻结签收待 Gate 0 |
 | S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约测试通过，HBAR Vault 已在 testnet 部署并注资（`28731d5`）；共享 R1-R5 core 与 live HBAR payment receipt 已验证 |
-| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | `d665132` 已完成真实 Graph -> x402 -> Vault -> HCS live loop；需要把付款头生成并入单次 Web run，且 R1 live 语义补丁待恢复 |
+| S3 | 外部适配器与正常 Agent 闭环 | 进行中 | `d665132` 完成真实 Graph -> x402 -> Vault -> HCS；R1/R5 已全绿。DeepSeek V4 Flash bounded selector 已接入，真实模型烟测待 Key；付款头生成仍需并入单次 Web run |
 | S4 | Verifier Core 与独立 CLI | 进行中 | `verify:live` 已对 correlation `live-1789115733718` 从 HCS+Vault+Graph+mirror payment receipt 得到 R1-R5 全部 `VERIFIED`；Web 契约一致性待接线 |
 | S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 检测完成；`slash:forged`（确定性 evidenceHash -> slash）与 `kill:switch`（冻结 -> NotActive 拒绝）脚本就绪（`8a45d23`）。真实处置待在最终一次性 Vault 上执行 |
 | S6 | 最小 Demo 控制器与用户工作台 | 进行中 | 真实 Vault/Graph/x402/HCS 闭环已由 CLI 跑通，Web 视觉壳完成；尚缺固定 Demo API、live 状态接入、owner kill 签名与浏览器验收 |
@@ -326,6 +326,7 @@ Gate 失败即停止前端开发，先修真实链路。通过证据是一条 CL
 
 - `createPaymentHeader()`：从 agent 服务端身份在内存中生成一次性真实付款头，不写 `.env`，不返回浏览器。
 - `runLive(mode, onProgress)`：复用现有 Graph、x402、vault 与 HCS 适配器；每完成一步报告状态；只允许 `normal | forged`。
+- DeepSeek V4 Flash 只从 `EXECUTE_VAULT / STOP` 中选择工具并生成短 rationale；代码根据 Graph TVL 与付款状态计算并校验策略结果，HCS 记录 prompt/input/output hash 和公开理由。
 - `verifyLive(correlationId)`：复用 CLI 的 R1-R5 组装并返回统一 `VerificationReport`。
 - `adjudicate(correlationId)`：重新验证，仅 `MISMATCH` 时按固定金额 slash；禁止浏览器提供 evidenceHash 或 amount。
 - `prepareKillTransaction()` 与 `probeFrozen()`：前者只返回固定 Vault 的 `to/data/chainId` 给 owner 钱包签名，后者让受限 agent 提交固定 1 tinybar 动作并读取 `NotActive` 事件。

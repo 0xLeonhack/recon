@@ -47,6 +47,7 @@ External service down → `UNVERIFIABLE`. Never silently treated as pass **or** 
 Agent (restricted signer — no owner keys)
   ├─ The Graph live query ──── pinned deployment + final block evidence
   ├─ x402 paidVerify ───────── RECON verify-query API · Blocky402 settlement on Hedera
+  ├─ DeepSeek tool choice ──── bounded EXECUTE_VAULT / STOP + rationale
   ├─ execute ──────────────── PolicyVault (HBAR, budget cap, allowlist, deadline, stake)
   └─ publishEvidence ──────── HCS topic (one correlationId end-to-end)
 
@@ -90,6 +91,7 @@ npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, sla
 | Hedera accounts (`HEDERA_OPERATOR_ID`, `HEDERA_PRIVATE_KEY`, agent/verifier/operator keys + addresses) | Create free testnet accounts at [portal.hedera.com](https://portal.hedera.com). The portal faucet is limited per user; additional ECDSA accounts can be created on-chain from the owner account with `scripts/create-accounts.ts`. Top up anytime via the web faucet (100 testnet HBAR per claim). Use **ECDSA** keys; each vault role must be a **distinct** account. |
 | `HEDERA_TOPIC_ID`, `VAULT_ADDRESS` | Produced by `npm run topic:create` and `npm run vault:deploy` — paste both outputs back into `.env`. |
 | `GRAPH_API_KEY`, `GRAPH_DEPLOYMENT_ID`, `GRAPH_FINAL_BLOCK_NUMBER` | API key from [thegraph.com](https://thegraph.com) dashboard; deployment ID of the subgraph to pin (we verified against the official Uniswap V3 deployment); a block number already indexed by that deployment. |
+| `DEEPSEEK_API_KEY` | Server-side DeepSeek API key. The bounded selector uses `deepseek-v4-flash`; the key and raw authorization header never enter HCS or the browser. |
 | `X402_VERIFY_PAYTO`, `X402_VERIFY_PRICE_TINYBAR` | Your EVM address receiving API payments; price in tinybar (default `10000000` = 0.1 HBAR). |
 
 > **Note:** the live demo scripts (`api:start`, `pay:header`, `run:live`, `verify:live`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. `verify:live` starts its vault log scan at the vault's deploy block (resolved from the mirror node, or `VAULT_DEPLOY_BLOCK` if set) — the public relay rejects any wider `eth_getLogs` span. The demo assumes values in Hedera's relay semantics: `msg.value`-style amounts (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar; calldata-style amounts (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
@@ -118,7 +120,7 @@ All of the below run against real services — real HCS messages, real vault tra
 ```bash
 npm run api:start     # x402-gated verify-query API on :4020 (set X402_VERIFY_SERVICE_URL)
 npm run pay:header    # agent signs the fee-sponsored HBAR transfer; writes X402_PAYMENT_HEADER to .env
-npm run run:live      # full loop: Graph query → 402 + paid verify → vault execute → 4 HCS evidence events
+npm run run:live      # full loop: Graph → x402 → DeepSeek rationale → vault → 5 HCS evidence events
 npm run verify:live   # independent verifier: replays evidence from HCS + vault + Graph → report
 npm run slash:forged  # forged correlation → verifier submits slash(evidenceHash) against operator stake
 npm run kill:switch   # owner freezes the vault → further agent actions rejected with NotActive
@@ -152,6 +154,7 @@ No mock is presented as live evidence. Per-evidence tracking: [`docs/ROADMAP.md`
 | The Graph double-replay | ✅ verified live against the official Uniswap V3 deployment; pinned `_meta.block.hash` is honestly recorded as null when the gateway prunes historical hashes |
 | Real x402 payment loop, live end-to-end run | ✅ verified live end-to-end (`run:live`: Graph query → 402 payment → vault execute → HCS) |
 | Live verifier R1-R5 | ✅ correlation `live-1789115733718` independently replayed from Graph, HCS, Vault and Hedera payment receipt; all five rules `VERIFIED` |
+| DeepSeek V4 Flash decision | 🔶 bounded JSON adapter and deterministic policy integration tested locally; real model run waits for `DEEPSEEK_API_KEY` |
 | Bazantic Recipe wiring, video | ⬜ planned |
 
 ## Stack

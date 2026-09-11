@@ -10,15 +10,17 @@ import {
   loadGraphProbeConfig,
   type GraphProbeConfig,
 } from '../src/adapters/graph';
+import { loadDeepSeekConfig, requestAgentToolDecision } from '../src/adapters/deepseek';
 import { createSdkSubmitter, createTestnetClient, publishEvidenceEvent } from '../src/adapters/hcs';
 import { executeVaultAction } from '../src/adapters/hedera';
-import type { EvidenceEvent } from '../src/core';
+import { assertToolMatchesPolicy, evaluateLiquidityPolicy } from '../src/agent';
+import type { EvidenceEvent, Sha256Hash } from '../src/core';
 import { hashCanonicalJson, sha256Hex, type JsonValue } from '../src/core';
 
 /**
  * Live demo runner: one correlation, real services, no mocks.
  *
- * DATA_QUERY -> API_PAYMENT -> ACTION_PROPOSED -> ACTION_EXECUTED -> HCS publish.
+ * DATA_QUERY -> API_PAYMENT -> RATIONALE -> ACTION_PROPOSED -> ACTION_EXECUTED -> HCS publish.
  * `--forged` flips only the DATA_QUERY canonicalResponseHash (PRD F5 cheat switch).
  *
  * Payment: if no programmatic payer is wired, complete the 402 payment
@@ -61,8 +63,13 @@ const topicId = requireEnv('HEDERA_TOPIC_ID');
 const recipient = requireEnv('VAULT_RECIPIENT');
 const amountTinybar = requireEnv('VAULT_AMOUNT_TINYBAR');
 const serviceUrl = requireEnv('X402_VERIFY_SERVICE_URL');
+const minimumTvlUsd = process.env.AGENT_MIN_TVL_USD ?? '1000000';
 
-async function runGraphQuery(): Promise<{ event: EvidenceEvent; response: unknown }> {
+async function runGraphQuery(): Promise<{
+  event: EvidenceEvent;
+  response: unknown;
+  responseHash: Sha256Hash;
+}> {
   let response: Response;
   try {
     response = await fetch(graphConfig.endpoint, {
@@ -106,17 +113,18 @@ async function runGraphQuery(): Promise<{ event: EvidenceEvent; response: unknow
       ...(forged ? { forged: 'true' } : {}),
     },
   };
-  return { event, response: parsed };
+  return { event, response: parsed, responseHash: replayedHash };
 }
 
 interface PaymentOutcome {
   readonly event: EvidenceEvent;
   readonly paid: boolean;
+  readonly status: 'VERIFIED' | 'MISMATCH';
 }
 
 async function runPaidVerify(
-  queryEvent: EvidenceEvent,
   graphResponse: unknown,
+  verifiedResponseHash: Sha256Hash,
 ): Promise<PaymentOutcome> {
   // 1. Unpaid request: the real service must answer with the 402 requirement set.
   const unpaid = await fetch(serviceUrl, {
@@ -126,7 +134,7 @@ async function runPaidVerify(
       schemaVersion: '1',
       deploymentId: graphConfig.deploymentId,
       blockNumber: String(graphConfig.finalBlockNumber),
-      claimedResponseHash: queryEvent.evidence.canonicalResponseHash,
+      claimedResponseHash: verifiedResponseHash,
       response: graphResponse,
     }),
   });
@@ -144,9 +152,8 @@ async function runPaidVerify(
   const requirement = requirementBody.accepts?.[0];
   console.error(`[run-live] 402 received: ${JSON.stringify(requirement)}`);
 
-  // 2. Payment. Programmatic payer is not wired yet; an out-of-band payment
-  // (Blocky402 dashboard) supplies the retry header. Abort otherwise — never
-  // fake a payment.
+  // 2. Payment. The current CLI consumes a freshly generated single-use
+  // header. The Web workflow will call the same generator in memory.
   const paymentHeader = process.env.X402_PAYMENT_HEADER?.trim();
   if (paymentHeader === undefined || paymentHeader.length === 0) {
     console.error(
@@ -170,7 +177,7 @@ async function runPaidVerify(
       schemaVersion: '1',
       deploymentId: graphConfig.deploymentId,
       blockNumber: String(graphConfig.finalBlockNumber),
-      claimedResponseHash: queryEvent.evidence.canonicalResponseHash,
+      claimedResponseHash: verifiedResponseHash,
       response: graphResponse,
     }),
   });
@@ -179,9 +186,17 @@ async function runPaidVerify(
   }
   const result = (await paid.json()) as { status?: string; settlementRef?: string };
   console.error(`[run-live] paid verify: ${JSON.stringify(result)}`);
+  const verificationStatus =
+    result.status === 'VERIFIED'
+      ? 'VERIFIED'
+      : result.status === 'MISMATCH'
+        ? 'MISMATCH'
+        : undefined;
+  if (verificationStatus === undefined) throw new Error('paid verify returned an invalid status');
 
   return {
     paid: true,
+    status: verificationStatus,
     event: {
       schemaVersion: '1',
       eventId: `${correlationId}-pay`,
@@ -197,6 +212,7 @@ async function runPaidVerify(
         payer: agentAccountId,
         payTo: requirement?.payTo ?? 'unknown',
         service: requirement?.resource ?? 'unknown',
+        verifiedResponseHash,
         settlementRef: result.settlementRef ?? 'missing',
         verificationStatus: result.status ?? 'unknown',
       },
@@ -204,13 +220,57 @@ async function runPaidVerify(
   };
 }
 
-async function runVaultAction(
+async function runAgentDecision(
   queryEvent: EvidenceEvent,
+  graphResponse: unknown,
+  payment: PaymentOutcome,
+): Promise<EvidenceEvent> {
+  const policy = evaluateLiquidityPolicy(graphResponse, minimumTvlUsd);
+  const decision = await requestAgentToolDecision(loadDeepSeekConfig(process.env), {
+    correlationId,
+    deploymentId: graphConfig.deploymentId,
+    blockNumber: String(graphConfig.finalBlockNumber),
+    poolId: policy.poolId,
+    totalValueLockedUsd: policy.totalValueLockedUsd,
+    paymentStatus: payment.status,
+    policyDecision: policy.decision,
+  });
+  assertToolMatchesPolicy(decision.tool, policy.decision, payment.status);
+  if (decision.tool !== 'EXECUTE_VAULT') throw new Error('AGENT_POLICY_HOLD');
+
+  console.error(
+    `[run-live] AI decision: model=${decision.model} tool=${decision.tool} rationale=${decision.rationale}`,
+  );
+  return {
+    schemaVersion: '1',
+    eventId: `${correlationId}-rationale`,
+    correlationId,
+    type: 'RATIONALE',
+    actor: 'agent:recon-demo',
+    subjectRef: `ai:deepseek:${decision.model}`,
+    payloadHash: decision.outputHash,
+    evidence: {
+      provider: decision.provider,
+      model: decision.model,
+      promptHash: decision.promptHash,
+      inputHash: decision.inputHash,
+      outputHash: decision.outputHash,
+      tool: decision.tool,
+      rationale: decision.rationale,
+      policyDecision: policy.decision,
+      poolId: policy.poolId,
+      totalValueLockedUsd: policy.totalValueLockedUsd,
+      minimumTvlUsd: policy.minimumTvlUsd,
+      claimedResponseHash: queryEvent.evidence.canonicalResponseHash ?? 'missing',
+    },
+  };
+}
+
+async function runVaultAction(
   paymentEvent: EvidenceEvent,
+  rationaleEvent: EvidenceEvent,
+  verifiedResponseHash: Sha256Hash,
 ): Promise<{ proposed: EvidenceEvent; executed: EvidenceEvent }> {
-  const dataQueryHash = queryEvent.evidence.canonicalResponseHash;
-  if (dataQueryHash === undefined)
-    throw new Error('DATA_QUERY evidence lacks canonicalResponseHash');
   const settlementRef = paymentEvent.evidence.settlementRef;
   if (settlementRef === undefined) throw new Error('API_PAYMENT evidence lacks settlementRef');
 
@@ -218,7 +278,8 @@ async function runVaultAction(
     correlationId,
     recipient,
     amountTinybar,
-    dataQueryHash,
+    dataQueryHash: verifiedResponseHash,
+    decisionHash: rationaleEvent.payloadHash,
     settlementRef,
   };
   const evidenceId = keccak256(toBytes(hashCanonicalJson(actionPayload)));
@@ -236,6 +297,7 @@ async function runVaultAction(
       recipient,
       amountTinybar,
       actionHash: hashCanonicalJson(actionPayload),
+      decisionHash: rationaleEvent.payloadHash,
     },
   };
 
@@ -277,12 +339,21 @@ async function runVaultAction(
 async function main(): Promise<void> {
   console.error(`[run-live] correlationId=${correlationId} forged=${forged}`);
 
-  const { event: queryEvent, response: graphResponse } = await runGraphQuery();
+  const {
+    event: queryEvent,
+    response: graphResponse,
+    responseHash: verifiedResponseHash,
+  } = await runGraphQuery();
   console.error(`[run-live] data query hash: ${queryEvent.evidence.canonicalResponseHash}`);
 
-  const payment = await runPaidVerify(queryEvent, graphResponse);
+  const payment = await runPaidVerify(graphResponse, verifiedResponseHash);
+  const rationale = await runAgentDecision(queryEvent, graphResponse, payment);
 
-  const { proposed, executed } = await runVaultAction(queryEvent, payment.event);
+  const { proposed, executed } = await runVaultAction(
+    payment.event,
+    rationale,
+    verifiedResponseHash,
+  );
 
   const client = createTestnetClient({
     operatorId: agentAccountId,
@@ -291,7 +362,7 @@ async function main(): Promise<void> {
   try {
     const submit = createSdkSubmitter(client, topicId);
     const published: Array<{ eventId: string; sequenceNumber: number }> = [];
-    for (const event of [queryEvent, payment.event, proposed, executed]) {
+    for (const event of [queryEvent, payment.event, rationale, proposed, executed]) {
       const result = await publishEvidenceEvent(topicId, event, submit);
       published.push({ eventId: event.eventId, sequenceNumber: result.sequenceNumber });
     }

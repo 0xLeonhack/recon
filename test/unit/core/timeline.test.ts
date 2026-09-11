@@ -47,6 +47,15 @@ describe('verifyCorrelationTimeline', () => {
     });
   });
 
+  it('requires an auditable rationale for a completed agent run', () => {
+    const withoutRationale = completeTimeline.filter((entry) => entry.type !== 'RATIONALE');
+
+    expect(verifyCorrelationTimeline(withoutRationale)).toMatchObject({
+      status: 'PENDING',
+      reasonCode: 'TIMELINE_INCOMPLETE',
+    });
+  });
+
   it('rejects mixed correlations, duplicate IDs, and reversed order', () => {
     const duplicate = event('DATA_QUERY', 1);
     expect(

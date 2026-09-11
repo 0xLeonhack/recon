@@ -11,6 +11,7 @@ const EVENT_ORDER: Readonly<Record<EvidenceEventType, number>> = Object.freeze({
 const REQUIRED_EVENTS: readonly EvidenceEventType[] = [
   'DATA_QUERY',
   'API_PAYMENT',
+  'RATIONALE',
   'ACTION_PROPOSED',
   'ACTION_EXECUTED',
 ];

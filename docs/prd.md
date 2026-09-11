@@ -1,6 +1,6 @@
 # RECON - 产品需求文档（PRD）
 
-> 版本：v1.1（2026-09-09）
+> 版本：v1.2（2026-09-11）
 > 配套文档：project-brief.md（对外版）、features-flow-highlights.md（讲稿）、learning-checklist.md（学习清单）
 > 本文件是开发执行基准。当前目标是先完成可验证的单场景闭环，再扩展约束和自动处置。
 
@@ -8,7 +8,7 @@
 
 ## 1. 概述
 
-**一句话**：RECON 是 AI Agent 的委托对账层，自动核对 agent「声称做了什么 / 实际做了什么 / 委托允许什么」，并把不一致变成可复验的证据。
+**一句话**：RECON 是 AI Agent 的委托对账工作台；用户从浏览器创建受限委托、启动 agent，并核对 agent「声称做了什么 / 实际做了什么 / 委托允许什么」，把不一致变成可复验的证据。
 
 **问题**：用户可以给 agent 设置限额、白名单和期限，但仍难以回答三个问题：约束是否真的执行、agent 是否漏报行为、agent 声称使用的数据能否重验。
 
@@ -25,7 +25,7 @@
 - G1：agent 使用受限执行身份自主提交动作，但不能绕过 PolicyVault 转移金库资产，也不持有 owner/admin 密钥。
 - G2：第三方无需信任 RECON 后端，即可从 HCS、Hedera mirror node 和固定版本的 The Graph 数据源重验 Demo 证据。
 - G3：自动发现「声称 / 实际 / 允许」之间的不一致，并留下可查询的处置记录。
-- G4：用 3-4 分钟视频完整展示正常流程、作弊检测和链上处置。
+- G4：用户不依赖终端，从 Web 完成钱包连接、委托创建与注资、Agent 运行、对账、作弊检测和链上处置；CLI 只作为独立复验入口。
 - G5：满足三个目标子赛道的明确资格条件，而不是只完成品牌层面的 SDK 集成。
 
 ### 黑客松版本的可信边界
@@ -47,11 +47,13 @@
 
 ### Demo 成功标准
 
+- 从全新浏览器会话开始，用户只通过 Web 和钱包确认完成一条正常闭环；视频不得用预置 fixture 或终端命令替代用户操作。
 - 一条正常动作从数据查询到链上执行再到验证，全流程有真实可点击证据。
 - 一条伪造 `responseHash` 的记录稳定显示为 `MISMATCH`。
 - 验证器可以通过独立 CLI 运行，前端使用同一验证逻辑。
 - 至少完成一次真实 x402 付费请求，并保存支付和结算证据。
 - 所有外部服务在录制前完成实网/测试网探测，不以 mock 数据冒充赛道集成。
+- 页面刷新后可按 `correlationId` 恢复已完成运行；外部服务失败或用户拒签时显示真实错误和可重试边界。
 
 ---
 
@@ -68,11 +70,13 @@
 
 ### 核心用户故事
 
-- US1：委托人创建单资产金库，设置总额度、收款方白名单和截止时间。
-- US2：agent 查询实时链上数据，并根据结果提交唯一一种动作：向白名单地址转移指定数量的资产。
-- US3：委托人或审计者查看 claimed / actual / allowed 对账结果及原始证据链接。
-- US4：第三方通过 CLI 重验 Graph 查询、HCS 消息和 Hedera 交易。
-- US5：伪造数据声明被检测后，verifier 提交带 `evidenceHash` 的罚没交易。
+- US1：委托人连接浏览器钱包并切换到 Hedera testnet；Web 不接收、存储或传输用户私钥。
+- US2：委托人在 Web 中创建单资产金库，设置总额度、收款方白名单和截止时间，用钱包签署部署与注资交易。
+- US3：委托人从 Web 启动 agent；agent 查询实时链上数据，并根据结果提交唯一一种动作：向白名单地址转移确定性计算的数量。
+- US4：委托人或审计者在 Web 输入 `correlationId`，查看 claimed / actual / allowed 对账结果、运行进度及原始证据链接。
+- US5：第三方通过 CLI 重验 Graph 查询、HCS 消息和 Hedera 交易。
+- US6：伪造数据声明被检测后，委托人在 Web 请求 verifier 裁决；verifier 独立复验后提交带 `evidenceHash` 的罚没交易。
+- US7：委托人用钱包触发 kill-switch，并在 Web 看到后续 agent 动作被合约拒绝。
 
 ---
 
@@ -141,8 +145,10 @@ contract PolicyVault {
 - LLM 只选择工具和生成可公开的简短说明；金额、地址、hash 和策略判断由确定性代码生成。
 - agent signer 只保留少量 gas 和受限调用权限，不保管 vault 资产或 owner 密钥。
 - 所有工具调用使用同一个 `correlationId`。
+- Web 通过异步运行 API 启动流程并轮询结构化状态；不得 shell-out 调用 CLI，也不得把服务密钥或支付载荷返回浏览器。
+- 运行参数中的收款方和金额必须由已部署 mandate 与确定性决策函数约束，不能信任浏览器任意提交。
 
-**验收**：端到端完成「Graph 实时查询 -> x402 付费验证 -> 金库动作 -> HCS 证据 -> 独立对账」。
+**验收**：用户在 Web 点击一次启动后，端到端完成「Graph 实时查询 -> x402 程序化付费验证 -> 金库动作 -> HCS 证据 -> 独立对账」；页面逐步显示每一步的 `PENDING / VERIFIED / MISMATCH / UNVERIFIABLE / REJECTED` 状态。
 
 ### F3 证据时间线（HCS）- P0
 
@@ -168,7 +174,7 @@ type EvidenceEvent = {
 
 **验收**：mirror node 能按 sequence number 读回全部消息；任一动作可以从 `correlationId` 找到提案、执行和支付证据。
 
-### F4 对账引擎、CLI 与面板 - P0
+### F4 用户工作台、对账引擎与 CLI - P0
 
 对账规则：
 
@@ -180,16 +186,25 @@ type EvidenceEvent = {
 
 状态固定为：`PENDING | VERIFIED | MISMATCH | UNVERIFIABLE | REJECTED`。
 
-- CLI：一条命令输入 topic ID、vault address 和 correlation ID，输出逐项验证结果。
-- 面板：claimed / actual / allowed 三栏；每行展示状态、原因和原始证据链接；前端复用 CLI 的验证核心库。
+- Web 首屏是可操作工作台，不是 landing page 或 fixture viewer。主流程固定为 `Connect -> Mandate -> Run -> Verify -> Respond`。
+- 钱包边界：使用浏览器 EIP-1193 provider 连接 Hedera testnet（chain ID 296）。部署 vault、注资和 kill-switch 由用户钱包直接签名；Web 和控制 API 永不接收 owner 私钥。
+- 服务边界：agent、agent operator、verifier 和 HCS 提交身份只存在于服务端适配器；前端只接收公开地址、结构化状态和公开证据引用。
+- 身份校验：控制 API 发放短时一次性 nonce，用户签名后建立 HttpOnly、SameSite 会话；受保护操作必须校验签名地址等于链上 vault owner。
+- 委托步骤：用户输入 HBAR 总预算、一个白名单收款方和截止时间；固定 agent/operator/verifier/beneficiary 地址必须在签名前完整展示。部署后单独签署注资交易并等待 receipt。
+- 运行步骤：Web 调用异步 Agent API，获得 `runId` 与 `correlationId`，轮询 DATA_QUERY、API_PAYMENT、ACTION_PROPOSED、ACTION_EXECUTED 和 HCS 发布状态。刷新后可按 `correlationId` 从公开证据恢复。
+- 对账步骤：claimed / actual / allowed 三栏；每行展示状态、原因和原始证据链接。Web 与 CLI 都消费 verifier core 的同一输出 schema，前端不得复制验证规则。
+- 处置步骤：只有 `MISMATCH` 可请求 verifier 裁决；服务端必须重新验证、使用固定罚没额度并按 `correlationId` 幂等。kill-switch 由 owner 钱包直接调用。
+- CLI：一条命令输入 topic ID、vault address 和 correlation ID，输出逐项验证结果，作为不依赖 Web 控制 API 的独立复验路径。
+- fixture 只允许在测试或显式开发开关下使用，并持续显示 `LOCAL FIXTURE`；生产构建和视频主流程不得默认进入 fixture。
 
-**验收**：正常流程全部 `VERIFIED`；伪造 hash 为 `MISMATCH`；外部服务不可用时为 `UNVERIFIABLE`，不得误显示为通过或作弊。
+**验收**：从无连接状态开始，用户仅通过 Web 与钱包完成部署、注资、正常运行和验证，正常流程全部 `VERIFIED`；再启动一次明确标识的 adversarial run，伪造 hash 为 `MISMATCH` 并可请求裁决；最后用 owner 钱包冻结 vault，后续运行显示 `REJECTED`。任一步外部服务不可用时为 `UNVERIFIABLE`，不得误显示为通过或作弊。
 
 ### F5 作弊检测与 verifier 处置 - P0
 
 - 内置作弊模式只修改 DATA_QUERY 的 `canonicalResponseHash`，其余流程与正常 agent 相同。
 - 验证器输出确定性的 mismatch 证据和 `evidenceHash`。
 - 黑客松版本由受信任 verifier 调用 `slash(amount, evidenceHash)`。
+- 用户只能从 Web 请求裁决，不能指定任意 `amount` 或 `evidenceHash`；服务端重新验证后才允许 verifier 签名，并返回 stake 前后值与公开交易引用。
 - 罚没对象是 Agent 运营方预存的 stake，不得从委托人的 vault 本金扣除。
 - UI 和讲稿统一使用“verifier-mediated slashing / verifier 裁决罚没”，不宣称 permissionless slashing。
 
@@ -201,7 +216,7 @@ type EvidenceEvent = {
 
 - 托管一个真实 x402-gated RECON 验证服务。
 - 在 Hedera testnet 通过 Blocky402 结算。
-- agent 完成至少一次真实付费请求。
+- agent 使用服务端付款身份完成至少一次程序化真实付费请求；依赖人工粘贴 `X402_PAYMENT_HEADER` 的流程不算用户可用闭环。
 - README 描述服务发现、402 响应、付款、重试、服务响应和链上结算。
 - HCS 保存可验证的支付审计索引。
 
@@ -224,7 +239,7 @@ type EvidenceEvent = {
 
 ### F7 Kill-switch - P0
 
-并入 F1，在 Demo 中单独展示一次冻结后拒绝执行的结果。
+并入 F1，由 owner 在 Web 中通过钱包签名触发；页面等待链上 receipt 并刷新 vault 状态。Demo 中随后启动一次最小 agent 动作，必须展示链上 `NotActive` 拒绝结果及交易链接。
 
 ### F8 价格止损 - P2
 
@@ -243,18 +258,21 @@ type EvidenceEvent = {
 ## 6. 架构与技术栈
 
 ```text
-Agent（受限 signer）
-  |-- The Graph live query -----> 固定 deployment + final block evidence
-  |-- x402 paidVerify ----------> RECON verification API / Blocky402
+Browser workbench
+  |-- EIP-1193 wallet ----------> deploy / fund / kill PolicyVault
+  |-- signed session -----------> control API (no owner key)
+  `-- correlation ID -----------> run progress / verification / evidence links
+
+Control API + Agent（server-side restricted identities）
+  |-- The Graph live query -----> fixed deployment + final block evidence
+  |-- x402 programmatic payer --> RECON verification API / Blocky402
   |-- execute ------------------> PolicyVault on Hedera
   `-- publish ------------------> HCS evidence topic
 
 Public verifier core
   |-- Hedera mirror node
   |-- The Graph gateway
-  `-- payment / vault evidence
-        |-- CLI
-        `-- React reconciliation panel
+  `-- payment / vault evidence --> Web report + independent CLI
 ```
 
 | 层 | 选型 |
@@ -264,7 +282,7 @@ Public verifier core
 | 链上数据 | The Graph live Subgraph，固定 deployment 与 final block |
 | 付费服务 | x402 + Blocky402；Bazantic Gateway/Recipe 作为组合工作流入口 |
 | Agent / 验证器 | TypeScript，共享 canonicalization 和 verification core |
-| 前端 | Vite + React |
+| 前端 | Vite + React + viem EIP-1193 wallet client；同源控制 API |
 
 ---
 
@@ -304,9 +322,9 @@ Public verifier core
 |---|---|---|
 | 9/9 | M0 风险清零 | Gate 0 三个 spike；确定最终三条赛道链路；代码进入 repo |
 | 9/10 | M1 单场景闭环 | 单资产 PolicyVault、Graph 查询、HCS 证据、agent 一次真实动作 |
-| 9/11 上午 | M2 可验证闭环 | CLI 对账、作弊 hash、verifier 罚没、x402 真实付款 |
-| 9/11 下午 | M3 可展示版本 | 三栏面板、部署链接、Check-in #2（11:59 前） |
-| 9/12 | M4 提交物 | 3-4 分钟视频、README、架构图、赛道证据清单 |
+| 9/11 | M2 可验证闭环 | CLI 对账、作弊 hash、verifier 罚没、x402 程序化真实付款；冻结控制 API 契约 |
+| 9/12 上午 | M3 用户可用闭环 | 浏览器钱包、委托部署与注资、异步 Agent run、真实验证报告和原始证据链接全部从 Web 跑通 |
+| 9/12 下午 | M4 处置与提交物 | Web 作弊裁决、owner kill-switch、拒绝结果；README、架构图、赛道证据清单与 3-4 分钟预录 |
 | 9/13 20:00 | M5 提交 | 完成平台提交，保留 4 小时缓冲；不再增加功能 |
 
 砍功能顺序：F10 -> F9 -> F8 -> 非必要 UI。F1-F7 只保留本文定义的单场景范围。
@@ -322,6 +340,9 @@ Public verifier core
 | Graph 历史响应无法重放 | 中 | 核心证据失效 | 固定 deployment + final block hash；选择保留历史状态的数据源 |
 | verifier 权限被质疑 | 高 | “自动罚没”叙事失真 | 主动展示信任模型，称为 verifier-mediated slashing |
 | 外部网络导致 Demo 超时 | 中 | 视频流程中断 | 预先录制真实交易；UI 显示明确 pending/unverifiable；不得用缓存冒充实时赛道调用 |
+| 浏览器钱包网络或签名错误 | 中 | 用户无法完成部署/注资/冻结 | 启动前检测 EIP-1193 provider、chain ID、owner 地址和 HBAR 余额；拒签保留表单并允许重试 |
+| 控制 API 泄漏服务密钥或被滥用 | 高 | 资金与证据真实性受损 | 同源签名会话、vault owner 校验、固定动作参数、幂等与速率限制；响应和日志不包含密钥或支付载荷 |
+| 长运行或页面刷新丢失状态 | 中 | Demo 中断且用户无法判断结果 | POST 立即返回 correlation ID；轮询状态；完成记录可从 HCS/mirror node 按 ID 恢复 |
 | 开发时间不足 | 高 | 无完整闭环 | 使用单资产、单查询、单动作、单作弊案例；不做止损和自建 subgraph |
 
 ---
@@ -333,6 +354,8 @@ Public verifier core
 - [ ] 合约地址、topic ID、Graph deployment、Blocky402 付款和 Bazantic Recipe 均可访问。
 - [ ] 合约在 HashScan 可查；关键外部调用有真实结果。
 - [ ] CLI 可独立重验一个正常 correlation ID 和一个作弊 correlation ID。
-- [ ] 3-4 分钟视频覆盖痛点、正常动作、三方对账、作弊标红、罚没和赛道证据。
+- [ ] Web 生产入口不默认加载 fixture；用户不打开终端即可完成连接钱包、部署、注资、运行、对账和处置。
+- [ ] 浏览器 bundle、网络响应和日志均不包含 owner、agent、operator、verifier 或 HCS 私钥及 x402 签名支付载荷。
+- [ ] 3-4 分钟视频从全新浏览器会话出发，以用户身份覆盖委托、正常动作、三方对账、作弊标红、罚没、kill-switch 和赛道证据。
 - [ ] Bazantic 提交包含账号标识和 Recipe 完整录屏。
 - [ ] 9/13 20:00 前完成提交。

@@ -1,9 +1,9 @@
 # RECON 实现路线图
 
-> 状态：开发前基线
-> 日期：2026-09-09
+> 状态：用户可用闭环重排
+> 日期：2026-09-11
 > 执行方式：单 Agent 串行推进
-> 产品基准：`docs/prd.md` v1.1
+> 产品基准：`docs/prd.md` v1.2
 
 本文只定义实现顺序、目录落位、阶段门槛和交付证据。产品范围、验收标准与对外口径仍以 `docs/prd.md` 为准。
 
@@ -14,7 +14,8 @@
 - S0.1 骨架完成；S0.2/S0.3 spike 代码就绪，S0.4 完成 facilitator 支持发现。
 - Evidence/Verification v1 类型、canonicalization、hash、R1/R2/R4 对账核心已实现并有单元测试。
 - `PolicyVault` 已实现单资产 HBAR 版本（HTS 探针稳定后仍可评估切回），合约测试通过。
-- Agent 确定性工作流、verifier 演示快照、CLI（`demo:verify` / `demo:verify:forged`）与 Web 面板雏形已就位。
+- Agent 确定性工作流、verifier 演示快照、CLI（`demo:verify` / `demo:verify:forged`）与 Web 视觉壳已就位。
+- Web 当前只能切换 `LOCAL_FIXTURE`，没有钱包、控制 API 或真实运行入口，不能视为用户可用产品，也不能作为视频主流程。
 - 全部演示数据仍为 `LOCAL_FIXTURE`；实网证据被凭据阻塞：缺 testnet 私钥、`GRAPH_API_KEY`、deployment ID 与 Blocky402 付款。
 - Gate 0 未通过前，新工作只允许 spike 代码、工程基础和文档。
 
@@ -28,7 +29,7 @@
 | S3 | 外部适配器与正常 Agent 闭环 | 进行中 | hedera vault 读/执行适配器（`56d96b3`）、HCS 读（`0e5c062`）+ 发布（`cdb6e61`）、live runner（`994988a`）完成；`run:live` 真实闭环与 x402 程序化付款待凭据 |
 | S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测（`a4d61e2`）；`verify:live` CLI 从 HCS+vault+Graph 真实证据出报告（`9ca0157`）。R5 结算回单查询待 facilitator 接口 |
 | S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 检测完成；`slash:forged`（确定性 evidenceHash → slash）与 `kill:switch`（冻结 → NotActive 拒绝）脚本就绪（`8a45d23`）。实网执行待凭据 |
-| S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`），证据控制台视觉与响应式优化已完成（`21a8cdf`）。付费 API 与 Bazantic Recipe 未开始 |
+| S6 | 控制 API、用户工作台与 Bazantic Recipe | 进行中 | Web 视觉壳与 fixture 对账视图完成（`f0e9f4f`-`21a8cdf`），但用户闭环为 0%；钱包、签名会话、程序化付款、真实 run/verify/respond API 与 Bazantic Recipe 均未完成 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |
 
 状态只使用 `未开始`、`进行中`、`阻塞`、`已完成`。只有满足该阶段完成标准并记录可复验证据后，才能标记为 `已完成`。
@@ -44,11 +45,12 @@ eth2026/
 ├── src/
 │   ├── core/                  # 纯领域模型、canonicalization、hash、对账规则
 │   ├── adapters/              # Hedera、HCS、Graph、x402、Bazantic 边界适配
-│   ├── agent/                 # 确定性 Agent 工具循环与流程编排
+│   ├── agent/                 # 可被 CLI/API 复用的确定性 Agent 工具循环与流程编排
 │   ├── verifier/              # R1-R5 验证流程和 evidenceHash 生成
 │   ├── cli/                   # 独立验证 CLI 入口
-│   └── api/                   # RECON 付费验证 API
-├── web/                       # Vite + React 三栏对账界面
+│   ├── api/                   # x402 公共验证服务 + 同源用户控制 API
+│   └── generated/             # 从 Hardhat artifact 生成的 ABI/bytecode 客户端
+├── web/                       # Vite + React 用户工作台：连接、委托、运行、验证、处置
 ├── test/
 │   ├── fixtures/              # 固定输入、规范化输出和链上事件样本
 │   ├── unit/                  # 纯逻辑测试
@@ -85,9 +87,11 @@ Verifier core + CLI
     ↓
 作弊检测 + verifier 裁决罚没 + kill-switch
     ↓
-x402 验证 API + Bazantic Recipe
+x402 程序化付款 + 可复用 Agent/Verifier 应用服务
     ↓
-React 三栏面板
+签名会话 + 控制 API + 浏览器钱包
+    ↓
+React 用户工作台 + Bazantic Recipe：Connect -> Mandate -> Run -> Verify -> Respond
     ↓
 端到端复验、部署、README、视频与提交
 ```
@@ -102,9 +106,9 @@ React 三栏面板
 |---|---|---|---|
 | M0 | 9/9 | S0 | 三个 Gate 0 spike 结论、代码和真实证据 |
 | M1 | 9/10 | S1-S3 | 单资产 vault、Graph、HCS 和 Agent 正常闭环 |
-| M2 | 9/11 上午 | S4-S5 | CLI 对账、作弊检测、罚没和真实 x402 付款 |
-| M3 | 9/11 下午 | S6 | 三栏面板、部署链接和 Check-in #2 |
-| M4 | 9/12 | S7 | README、证据清单和 3-4 分钟视频 |
+| M2 | 9/11 | S4-S5 | CLI 对账、作弊检测、罚没、程序化真实 x402 付款与控制 API 契约 |
+| M3 | 9/12 上午 | S6 | 用户从 Web 连接钱包、部署/注资、启动真实 run 并得到对账结果 |
+| M4 | 9/12 下午 | S6-S7 | Web 作弊裁决、kill-switch、README、证据清单和 3-4 分钟预录 |
 | M5 | 9/13 20:00 | 提交 | 平台提交完成，此后不增加功能 |
 
 ## 4. S0：最小工程骨架与 Gate 0
@@ -295,38 +299,96 @@ CLI 输入 topic ID、vault address 和 correlation ID，输出逐项状态、re
 
 完成标准：伪造记录在 10 秒内显示 `MISMATCH`；罚没交易在 60 秒内可查；罚没仅减少 Agent operator stake；演示和文档统一使用“verifier 裁决罚没”。
 
-## 10. S6：API、Bazantic 与 Web 面板
+## 10. S6：控制 API、用户工作台与 Bazantic
 
-### S6.1 付费验证 API
+S6 的完成定义不是“页面能展示 fixture”，而是一个真实用户能从全新浏览器会话走完 `Connect -> Mandate -> Run -> Verify -> Respond`。开发和测试可保留 fixture，但生产入口与视频主流程必须连接真实 Hedera testnet、HCS、The Graph 和 x402 服务。
 
-将 Gate 0 的最小服务接入正式 verifier core：
+### S6.0 用户闭环前置 Gate
 
-- 请求和响应使用版本化 schema。
-- 支付成功不等于验证通过。
-- 重复请求按幂等键处理。
-- 日志不包含授权头、签名支付载荷或私密 API 内容。
+以下前置项按顺序完成，任何一项未通过时都不进入视频录制：
 
-### S6.2 Bazantic Recipe
+1. 用真实凭据跑通 S0 的 Graph 固定区块重放、Hedera testnet 部署/转账和 Blocky402 结算。
+2. 将 `run-live` 的人工 `X402_PAYMENT_HEADER` 替换为服务端程序化 payer；保存 402、付款、重试和结算引用。
+3. 将 `scripts/run-live.ts`、`verify-live.ts`、`slash-forged.ts` 的可复用逻辑下沉到 `src/agent/`、`src/verifier/` 和应用服务；API 不得 shell-out 执行脚本。
+4. 固定公开运行配置：chain ID、RPC、mirror node、HCS topic、Graph deployment、agent/operator/verifier/beneficiary 地址和默认动作参数。私钥只从服务端环境读取。
 
-Recipe 串联 The Graph 与 RECON API，最终 Agent 动作必须依赖两个服务的真实输出。只在实际可运行后记录 Gateway、Recipe 和账户证据。
+完成标准：服务层可在不依赖 CLI 进程和人工付款头的情况下完成一条真实正常 run；缺少任一外部凭据时明确返回 `UNVERIFIABLE`，不回退 fixture。
 
-### S6.3 React 面板
+### S6.1 控制 API 与签名会话
 
-最后实现面板，因为它消费已经稳定的 verifier 输出：
+在 x402 公共服务之外建立同源控制 API，使用版本化 Zod schema：
 
-- Claimed / Actual / Allowed 三栏对照。
-- 状态文字、原因和原始证据链接。
-- `MISMATCH`、`UNVERIFIABLE`、`REJECTED`、`PENDING` 明确区分。
-- 正常和作弊 correlation ID 可稳定切换展示。
-- 桌面与移动端都能阅读长 hash、地址、金额和失败原因。
+| 端点 | 用途 | 权限与约束 |
+|---|---|---|
+| `GET /api/config` | 返回公开网络、角色、topic 和合约版本 | 不返回 URL 中的密钥、私钥或支付载荷 |
+| `POST /api/session/challenge` | 为钱包地址生成短时一次性 nonce | 有 TTL、一次性消费和速率限制 |
+| `POST /api/session` | 验签并建立 HttpOnly、SameSite 会话 | 签名文案包含 origin、chain ID、nonce 和过期时间 |
+| `DELETE /api/session` | 注销当前钱包会话 | 清除服务端会话和 cookie；账户/网络变化时调用 |
+| `POST /api/vaults/:address/prepare` | 校验链上 owner/mandate，并由 operator 存入固定演示 stake | 调用者必须是 vault owner；金额服务端固定；按 vault 幂等 |
+| `POST /api/vaults/:address/probe-frozen` | kill-switch 后提交固定 1 tinybar 探测动作 | 仅 Frozen vault；受限 agent 签名；必须得到链上 `NotActive` 拒绝 |
+| `POST /api/runs` | 启动 normal 或 adversarial Agent run | 调用者必须是 vault owner；recipient/amount 由 mandate 与确定性函数约束 |
+| `GET /api/runs/:correlationId` | 获取步骤状态与公开引用 | owner 可看运行态；完成证据可公开读取 |
+| `POST /api/verifications` | 从真实外部证据运行共享 verifier | 输入 vault + correlation ID；输出统一 `VerificationReport` |
+| `POST /api/adjudications/:correlationId/slash` | 请求 verifier 裁决罚没 | 服务端重新验证；仅 `MISMATCH`；固定金额；幂等 |
 
-完成标准：Web 和 CLI 对同一 correlation ID 得到相同结果；前端不自行实现第二套验证规则，也不隐藏失败或不可验证状态。
+长任务使用内存 job 状态 + HCS 权威完成记录。`POST /api/runs` 立即返回 `correlationId`；Web 每 1-2 秒轮询。服务重启后，已完成 run 必须可从 HCS/mirror node 重建；进行中的 run 可以诚实标记 `UNVERIFIABLE / SERVICE_RESTARTED`，不得伪造完成状态。
 
-实现证据（2026-09-11）：
+所有 mutation 端点校验 `Origin`、会话与 CSRF token。测试至少覆盖 nonce 重放、过期签名、错误 chain/origin、非 owner、任意 amount/recipient 注入、重复 run、重复 slash、VERIFIED 禁止 slash、非 Frozen 探测、外部超时和响应脱敏。
 
-- `21a8cdf`：重构 Evidence Console 的状态总览、三栏对账、规则输出和证据时间线；Normal / Forged 模式继续消费同一 verifier 快照。
+### S6.2 钱包与合约交互层
+
+Web 使用当前已安装的 viem 和浏览器 EIP-1193 provider：
+
+1. 检测钱包；请求账户；添加或切换 Hedera testnet chain ID 296。
+2. 创建短时签名会话；监听 `accountsChanged` / `chainChanged` 并立即失效旧会话。
+3. 从 Hardhat artifact 自动生成只读 ABI/bytecode 模块，并由 stale-check 保证与合约一致；不维护手写第二份 ABI。
+4. 用户填写 HBAR budget cap、单个 recipient 和 deadline。agent/operator/verifier/beneficiary 为只读公开配置，签名前完整确认。
+5. owner 钱包部署 `PolicyVault`，等待 receipt，确认链上 owner 与 mandate；随后单独调用 payable `fund()` 注资。
+6. owner 钱包调用 `kill(reasonHash)`；前端等待 receipt 后从链上刷新状态。
+
+所有金额在表单层以 HBAR 展示、在边界转换为整数字符串 tinybar；禁止浮点运算。拒签、余额不足、网络错误和交易失败保留用户输入并提供明确重试，不允许前端代签或上传私钥。
+
+### S6.3 单工作台产品流
+
+保留一个工作台而非增加营销页，按以下状态机呈现：
+
+1. **Connect**：钱包、账户、Hedera testnet、服务健康与凭据就绪状态。
+2. **Mandate**：表单、角色确认、Deploy、Fund、operator stake 和链上状态；每个交易提供 HashScan 链接。
+3. **Run**：一个主按钮启动 normal run；步骤时间线实时展示 Graph query、x402 payment、proposal、vault execution 与 HCS publish。高级 Demo 控制中可启动唯一的 forged-hash adversarial run。
+4. **Verify**：自动加载刚完成的 correlation ID，也允许粘贴其他 ID；展示 claimed / actual / allowed、R1-R5、evidenceHash 和原始公开引用。
+5. **Respond**：`MISMATCH` 时显示“Request verifier adjudication”，清楚标注受信任 verifier；owner 可执行 kill-switch。交易确认后，“Test blocked action”让受限 agent 提交固定 1 tinybar 探测动作，并展示 stake 变化与链上 `NotActive` 拒绝结果。
+
+页面刷新时从 URL/localStorage 恢复 vault 与 correlation ID，但所有状态以链上、HCS 和 verifier API 为准。生产入口不得自动调用 `createDemoSnapshot()`；fixture 只能通过显式开发开关进入并持续标注。
+
+可访问性和响应式验收：键盘可完成除钱包弹窗外的操作；pending 按钮防重复提交；错误与状态不只靠颜色；320 / 768 / 1440 px 无页面级横向溢出；长 hash、地址和 reason code 可读且不遮挡。
+
+### S6.4 Web / CLI 契约与证据链接
+
+- API、CLI 和 Web 共用 `VerificationReport` 与 run-status schema；添加同一 live fixture/录制输入的契约测试，禁止前端推导第二套结论。
+- Hedera 交易、合约和 HCS topic 指向 HashScan 或 mirror node；Graph 展示 deployment、final block、query/variables hash 和可复验命令；x402 展示不含签名载荷的付款与 settlement 引用。
+- 外部链接必须根据公开 reference 结构化生成并校验协议/网络，不能把任意服务端字符串直接注入 `href`。
+- 生产构建扫描 `HEDERA_*_PRIVATE_KEY`、`GRAPH_API_KEY`、付款头和授权头；命中即失败。
+
+### S6.5 Bazantic Recipe
+
+Recipe 串联 The Graph 与同一个 RECON x402 API，最终 Agent 动作必须依赖两个服务的真实输出。只在实际可运行后记录 Gateway、Recipe、账户和完整录屏证据；Bazantic 失败不得阻止 Web 对 Hedera/The Graph 的错误状态如实呈现。
+
+### S6.6 S6 完成 Gate
+
+必须一次性满足：
+
+- 从全新浏览器会话开始，不打开终端，用户通过钱包完成 deploy、fund、normal run 和验证，最终为 `VERIFIED`。
+- 同一用户启动 adversarial run，10 秒内看到 `MISMATCH`；请求裁决后 60 秒内看到相同 `evidenceHash` 的真实 slash 交易和 stake 变化。
+- owner 触发 kill-switch，随后一次 agent 动作在链上被拒绝并显示 `REJECTED / NotActive`。
+- 页面展示真实可点击证据；刷新后可恢复完成记录；断网/拒签/服务失败不显示成功。
+- CLI 对同一 normal/adversarial correlation ID 给出与 Web 相同的逐项结果。
+- 自动检查、浏览器交互测试、合约测试和一次 testnet smoke 全部通过，且浏览器 bundle/网络响应/日志无密钥或支付签名材料。
+
+当前证据（仅视觉层，不计入 S6 完成）：
+
+- `21a8cdf`：重构 fixture Evidence Console 的状态总览、三栏对账、规则输出和证据时间线。
 - `npm run check`：format、lint、typecheck、109 个单测、合约编译和 Web 生产构建通过。
-- Chrome 无头实测：320 / 768 / 1440 px 页面无横向溢出；Normal 切换 Forged 后总状态为 `MISMATCH`，规则状态为一项 `MISMATCH`、一项 `VERIFIED`。
+- Chrome 无头实测：320 / 768 / 1440 px fixture 页面无横向溢出；Normal/Forged 状态切换正确。
 
 ## 11. S7：端到端交付
 
@@ -334,14 +396,16 @@ Recipe 串联 The Graph 与 RECON API，最终 Agent 动作必须依赖两个服
 
 1. 运行 format、lint、typecheck、unit、contract、integration 和 build。
 2. 从空环境执行 README setup，修正不可复现步骤。
-3. 运行一个真实正常流程和一个只伪造 response hash 的作弊流程。
-4. 保存合约地址、topic ID、Graph deployment、交易、付款和 Recipe 证据。
-5. 更新 README 的架构、可信边界、AI 使用范围与复验命令。
-6. 部署公开 Demo，检查所有链接和网络标识。
-7. 按 3-4 分钟脚本录制视频，并预留真实交易失败时的重新录制时间。
-8. 对照 PRD 提交清单逐项签收，9/13 20:00 后不再增加功能。
+3. 从全新浏览器会话执行一次完整用户流程：连接钱包 -> 创建委托 -> 部署与注资 -> normal run -> Web 验证。
+4. 继续在同一工作台执行 adversarial run -> mismatch -> 请求 verifier 裁决 -> slash -> owner kill-switch -> 后续动作被拒绝。
+5. 用独立 CLI 重验 Web 刚生成的两个 correlation ID，保存一致性输出。
+6. 保存合约地址、topic ID、Graph deployment、交易、付款和 Recipe 证据。
+7. 更新 README 的用户操作、架构、可信边界、AI 使用范围与复验命令。
+8. 部署公开 Demo，使用无缓存浏览器检查钱包、刷新恢复、所有链接和网络标识。
+9. 按 3-4 分钟用户视角脚本录制视频，并预留真实交易失败时的重新录制时间；终端只可在结尾用作独立复验证据。
+10. 对照 PRD 提交清单逐项签收，9/13 20:00 后不再增加功能。
 
-最终完成标准：评委可以只根据 README 和公开基础设施，分别复验一个正常 correlation ID 和一个作弊 correlation ID。
+最终完成标准：评委既能仅通过 Web 与钱包亲自走完一次用户闭环，也能只根据 README、CLI 和公开基础设施分别复验一个正常 correlation ID 和一个作弊 correlation ID。
 
 ## 12. 每次开发循环
 

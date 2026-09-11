@@ -1,6 +1,6 @@
 # RECON - 功能、流程与演示重点
 
-> 配合 project-brief.md 使用。本文只保留已经进入 v1.1 PRD 的功能与讲稿口径。
+> 配合 project-brief.md 使用。本文只保留已经进入 v1.2 PRD 的功能与讲稿口径。
 
 ---
 
@@ -8,12 +8,13 @@
 
 | # | 功能 | 一句话 |
 |---|---|---|
-| 1 | 单资产策略金库 | 用户将总预算、收款方白名单和截止时间写入合约，由合约在执行时检查 |
-| 2 | 受限执行 agent | agent 有 gas 与受限 signer，但没有 owner/admin 权限，不能绕过 vault 动用金库资产 |
-| 3 | 三方自动对账 | 同屏比较 claimed / actual / allowed，不一致时给出明确原因 |
-| 4 | 独立重放验证 | 固定 Graph deployment 和最终区块，网页与 CLI 复用同一个验证核心 |
-| 5 | 作弊检测与裁决罚没 | 伪造 response hash 会被标红，受信任 verifier 使用相同 evidence hash 发起 Demo 版罚没 |
-| 6 | 付费验证与冻结 | agent 真实购买 Hedera x402 验证服务；委托人可用 kill-switch 冻结后续执行 |
+| 1 | 用户工作台 | 用户在 Web 连接钱包，完成委托、运行、验证和处置，不依赖终端 |
+| 2 | 单资产策略金库 | 用户用钱包签署部署与注资；合约在执行时检查总预算、白名单和截止时间 |
+| 3 | 受限执行 agent | agent 有 gas 与受限 signer，但没有 owner/admin 权限，不能绕过 vault 动用金库资产 |
+| 4 | 三方自动对账 | 同屏比较 claimed / actual / allowed，不一致时给出明确原因和原始证据 |
+| 5 | 独立重放验证 | 固定 Graph deployment 和最终区块，Web 与 CLI 复用同一个验证核心 |
+| 6 | 作弊检测与裁决罚没 | 伪造 response hash 会被标红，受信任 verifier 使用相同 evidence hash 发起 Demo 版罚没 |
+| 7 | 付费验证与冻结 | agent 程序化购买 Hedera x402 验证服务；委托人用钱包触发 kill-switch |
 
 自动价格止损、自建 subgraph 和 Agent Kit 插件均为 P2，不进入基础 Demo。
 
@@ -22,30 +23,39 @@
 ## 使用流程
 
 ```text
-1. 设置委托
-   创建单资产 PolicyVault
-   -> 配置总预算、白名单收款方、截止时间
-   -> 注入测试资产
-   -> agent 获得受限执行身份
+1. Connect
+   浏览器钱包 -> Hedera testnet (chain ID 296)
+   -> 签名短时会话
+   -> Web 确认 owner 地址、余额与服务状态
 
-2. Agent 执行
-   The Graph live query
+2. Mandate
+   用户填写总预算、白名单收款方、截止时间
+   -> 查看固定 agent/operator/verifier/beneficiary 角色
+   -> 钱包签署 PolicyVault 部署
+   -> 钱包签署 HBAR 注资
+   -> operator 存入独立 stake
+
+3. Run
+   用户点击 Run Agent
+   -> The Graph live query
    -> 固定 deployment、最终区块、query/variables、response hash
-   -> 购买一次 Blocky402 / Hedera x402 验证服务
+   -> 服务端程序化购买一次 Blocky402 / Hedera x402 验证服务
    -> 根据两个服务的结果生成确定性动作参数
    -> PolicyVault 检查并执行
    -> HCS 用 correlation ID 关联全部证据
 
-3. 对账
-   CLI 或网页读取 HCS、mirror node、Graph 和付款证据
+4. Verify
+   Web 读取 HCS、mirror node、Graph 和付款证据
    -> claimed vs actual vs allowed
    -> VERIFIED / MISMATCH / UNVERIFIABLE / REJECTED / PENDING
+   -> CLI 可对同一 correlation ID 独立复验
 
-4. 处置
-   正常记录 -> VERIFIED
-   伪造 response hash -> MISMATCH
-   verifier -> 带 evidence hash 的罚没交易
-   owner -> kill-switch -> 后续动作被拒绝
+5. Respond
+   adversarial run 只伪造 response hash -> MISMATCH
+   -> 用户请求受信任 verifier 裁决
+   -> verifier 独立复验后提交带 evidence hash 的罚没交易
+   -> 用户钱包签署 kill-switch
+   -> 后续 agent 动作被链上拒绝
 ```
 
 ---
@@ -74,13 +84,16 @@
 
 ## 3-4 分钟视频顺序
 
-1. 20 秒：问题与三栏对账。
-2. 30 秒：创建单资产 mandate。
-3. 60 秒：Graph 查询、x402 付款和 vault 执行。
-4. 40 秒：正常记录独立验证为绿色。
-5. 40 秒：作弊 hash 被标红，展示 mismatch 原因。
-6. 30 秒：verifier 罚没与 owner kill-switch。
-7. 20 秒：三个具体子赛道的证据链接。
+1. 15 秒：一句话问题；立即进入工作台，不展示 landing page。
+2. 35 秒：从未连接状态开始，连接钱包并确认 Hedera testnet；填写 mandate，签署部署与注资。
+3. 55 秒：点击 Run Agent；页面实时走过 Graph 查询、x402 付款、vault 执行与 HCS 发布。
+4. 30 秒：同一页面自动显示 VERIFIED 三栏对账、R1-R5 与真实证据链接。
+5. 40 秒：启动 adversarial run；展示 forged hash 与重放 hash 不一致、状态变为 MISMATCH。
+6. 35 秒：请求 verifier 裁决；展示相同 evidence hash、真实 slash 交易和 operator stake 变化。
+7. 25 秒：用户钱包签署 kill-switch；下一次 agent 动作显示 REJECTED / NotActive。
+8. 20 秒：用 CLI 重验同一 correlation ID，并收束三个赞助商的具体证据。
+
+录制规则：所有主流程动作从 Web 发起；可剪去 testnet 等待时间，但不能用 fixture、预置成功状态或终端脚本替代交易。钱包弹窗、交易 hash、网络标识和关键状态变化必须入镜。
 
 ---
 

@@ -28,7 +28,7 @@
 | S3 | 外部适配器与正常 Agent 闭环 | 进行中 | hedera vault 读/执行适配器（`56d96b3`）、HCS 读（`0e5c062`）+ 发布（`cdb6e61`）、live runner（`994988a`）完成；`run:live` 真实闭环与 x402 程序化付款待凭据 |
 | S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测（`a4d61e2`）；`verify:live` CLI 从 HCS+vault+Graph 真实证据出报告（`9ca0157`）。R5 结算回单查询待 facilitator 接口 |
 | S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 检测完成；`slash:forged`（确定性 evidenceHash → slash）与 `kill:switch`（冻结 → NotActive 拒绝）脚本就绪（`8a45d23`）。实网执行待凭据 |
-| S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`）。付费 API 与 Bazantic Recipe 未开始 |
+| S6 | 付费 API、Bazantic Recipe 与 Web 面板 | 进行中 | Web 面板消费共享 verifier 快照（`f0e9f4f`-`a7e47e2`），证据控制台视觉与响应式优化已完成（`21a8cdf`）。付费 API 与 Bazantic Recipe 未开始 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |
 
 状态只使用 `未开始`、`进行中`、`阻塞`、`已完成`。只有满足该阶段完成标准并记录可复验证据后，才能标记为 `已完成`。
@@ -321,6 +321,12 @@ Recipe 串联 The Graph 与 RECON API，最终 Agent 动作必须依赖两个服
 - 桌面与移动端都能阅读长 hash、地址、金额和失败原因。
 
 完成标准：Web 和 CLI 对同一 correlation ID 得到相同结果；前端不自行实现第二套验证规则，也不隐藏失败或不可验证状态。
+
+实现证据（2026-09-11）：
+
+- `21a8cdf`：重构 Evidence Console 的状态总览、三栏对账、规则输出和证据时间线；Normal / Forged 模式继续消费同一 verifier 快照。
+- `npm run check`：format、lint、typecheck、109 个单测、合约编译和 Web 生产构建通过。
+- Chrome 无头实测：320 / 768 / 1440 px 页面无横向溢出；Normal 切换 Forged 后总状态为 `MISMATCH`，规则状态为一项 `MISMATCH`、一项 `VERIFIED`。
 
 ## 11. S7：端到端交付
 

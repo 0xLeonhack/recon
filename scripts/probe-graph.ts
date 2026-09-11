@@ -1,4 +1,13 @@
+import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
+
 import { GraphReplayError, loadGraphProbeConfig, replayGraphData } from '../src/adapters/graph';
+
+try {
+  loadEnvFile(resolve('.env'));
+} catch {
+  // Allow CI and explicit shell environments to provide configuration.
+}
 
 try {
   const config = loadGraphProbeConfig(process.env);

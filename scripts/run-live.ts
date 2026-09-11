@@ -134,7 +134,12 @@ async function runPaidVerify(
     throw new Error(`expected 402 for unpaid verify-query, got ${unpaid.status}`);
   }
   const requirementBody = (await unpaid.json()) as {
-    accepts?: ReadonlyArray<{ amount?: string; asset?: string }>;
+    accepts?: ReadonlyArray<{
+      amount?: string;
+      asset?: string;
+      payTo?: string;
+      resource?: string;
+    }>;
   };
   const requirement = requirementBody.accepts?.[0];
   console.error(`[run-live] 402 received: ${JSON.stringify(requirement)}`);
@@ -183,12 +188,15 @@ async function runPaidVerify(
       correlationId,
       type: 'API_PAYMENT',
       actor: 'agent:recon-demo',
-      subjectRef: 'service:recon:verify-query',
-      payloadHash: hashCanonicalJson({ service: 'verify-query' }),
+      subjectRef: requirement?.resource ?? 'service:recon:verify-query',
+      payloadHash: hashCanonicalJson({ service: requirement?.resource ?? 'verify-query' }),
       evidence: {
         facilitator: 'blocky402',
         asset: requirement?.asset ?? '0.0.0',
         amountTinybar: requirement?.amount ?? 'unknown',
+        payer: agentAccountId,
+        payTo: requirement?.payTo ?? 'unknown',
+        service: requirement?.resource ?? 'unknown',
         settlementRef: result.settlementRef ?? 'missing',
         verificationStatus: result.status ?? 'unknown',
       },

@@ -3,6 +3,8 @@ import { loadEnvFile } from 'node:process';
 
 import {
   createVaultPublicClient,
+  HederaPaymentReceiptError,
+  readHbarPaymentReceipt,
   readVaultActions,
   readVaultState,
   type VaultActionEvent,
@@ -15,6 +17,7 @@ import {
   verifyCorrelationTimeline,
   verifyExecutedSet,
   verifyGraphResponseHash,
+  verifyPaymentConsistency,
   type ActualAction,
   type ClaimedAction,
   type EvidenceEvent,
@@ -310,16 +313,58 @@ if (paymentEvent === undefined) {
     sourceRefs: [],
   });
 } else {
-  // Settlement receipt lookup is facilitator-specific and not wired yet;
-  // report UNVERIFIABLE instead of pretending the receipt was checked. The
-  // claimed values stay in the API_PAYMENT evidence for future R5 wiring.
-  findings.push({
-    rule: 'R5',
-    status: 'UNVERIFIABLE',
-    reasonCode: 'PAYMENT_RECEIPT_MISSING',
-    message: 'Settlement receipt lookup is not available; payment claim remains unverified.',
-    sourceRefs: [`hcs:${paymentEvent.eventId}`],
-  });
+  const { asset, amountTinybar, settlementRef, payer, payTo, service } = paymentEvent.evidence;
+  if (
+    asset === undefined ||
+    amountTinybar === undefined ||
+    settlementRef === undefined ||
+    payer === undefined ||
+    payTo === undefined ||
+    service === undefined
+  ) {
+    findings.push({
+      rule: 'R5',
+      status: 'MISMATCH',
+      reasonCode: 'PAYMENT_EVIDENCE_INCOMPLETE',
+      message:
+        'The API_PAYMENT evidence is missing payer, recipient, service, amount or settlement details.',
+      sourceRefs: [`hcs:${paymentEvent.eventId}`],
+    });
+  } else {
+    try {
+      const receipt = await readHbarPaymentReceipt(
+        process.env.HEDERA_MIRROR_NODE_URL ?? DEFAULT_MIRROR_NODE_URL,
+        {
+          settlementRef,
+          payer,
+          payTo,
+          service: process.env.X402_VERIFY_RESOURCE ?? '',
+        },
+      );
+      findings.push(
+        verifyPaymentConsistency(
+          {
+            asset,
+            amount: amountTinybar,
+            service,
+            settlementRef,
+            sourceRef: `hcs:${paymentEvent.eventId}`,
+          },
+          receipt,
+        ),
+      );
+    } catch (error) {
+      const code = error instanceof HederaPaymentReceiptError ? error.code : 'UNKNOWN';
+      findings.push({
+        rule: 'R5',
+        status: code === 'PAYMENT_MISMATCH' ? 'MISMATCH' : 'UNVERIFIABLE',
+        reasonCode:
+          code === 'PAYMENT_MISMATCH' ? 'PAYMENT_TRANSFER_MISMATCH' : 'PAYMENT_RECEIPT_UNAVAILABLE',
+        message: `The Hedera settlement receipt could not be verified (${code}).`,
+        sourceRefs: [`hcs:${paymentEvent.eventId}`, `hedera:transaction:${settlementRef}`],
+      });
+    }
+  }
 }
 
 // ---------- Report ----------

@@ -23,11 +23,11 @@
 
 | 阶段 | 目标 | 当前状态 | 完成证据 |
 |---|---|---|---|
-| S0 | 工程骨架与核心真实性 Gate | 进行中 | HBAR Vault 已部署/注资，Graph 与 x402 live loop 已跑通；R1 gateway 语义和 R5 settlement receipt 待收口；Bazantic 独立 Gate 未完成 |
+| S0 | 工程骨架与核心真实性 Gate | 进行中 | Hedera/Graph/x402/R1-R5 核心 Gate 已用 `live-1789115733718` 全绿通过；Bazantic 独立 Gate 未完成 |
 | S1 | 冻结 Evidence、Verification、PolicyVault v1 契约 | 进行中 | Evidence/Verification v1 与 canonicalization 有实现和单测（`fb9a9f7`-`96d1a8c`）；PolicyVault v1 接口落地（`c8f4092`）。冻结签收待 Gate 0 |
-| S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约测试通过，HBAR Vault 已在 testnet 部署并注资（`28731d5`）；共享 R1-R5 core 已实现，live R5 adapter 待补 |
+| S2 | PolicyVault 与共享 Core | 进行中 | PolicyVault 合约测试通过，HBAR Vault 已在 testnet 部署并注资（`28731d5`）；共享 R1-R5 core 与 live HBAR payment receipt 已验证 |
 | S3 | 外部适配器与正常 Agent 闭环 | 进行中 | `d665132` 已完成真实 Graph -> x402 -> Vault -> HCS live loop；需要把付款头生成并入单次 Web run，且 R1 live 语义补丁待恢复 |
-| S4 | Verifier Core 与独立 CLI | 进行中 | R1-R5 全部实现并有单测（`a4d61e2`）；`verify:live` CLI 从 HCS+vault+Graph 真实证据出报告（`9ca0157`）。R5 结算回单查询待 facilitator 接口 |
+| S4 | Verifier Core 与独立 CLI | 进行中 | `verify:live` 已对 correlation `live-1789115733718` 从 HCS+Vault+Graph+mirror payment receipt 得到 R1-R5 全部 `VERIFIED`；Web 契约一致性待接线 |
 | S5 | 作弊、罚没与冻结演示 | 进行中 | fixture 级 forged 检测完成；`slash:forged`（确定性 evidenceHash -> slash）与 `kill:switch`（冻结 -> NotActive 拒绝）脚本就绪（`8a45d23`）。真实处置待在最终一次性 Vault 上执行 |
 | S6 | 最小 Demo 控制器与用户工作台 | 进行中 | 真实 Vault/Graph/x402/HCS 闭环已由 CLI 跑通，Web 视觉壳完成；尚缺固定 Demo API、live 状态接入、owner kill 签名与浏览器验收 |
 | S7 | 端到端验证、部署与提交物 | 未开始 | - |
@@ -317,6 +317,8 @@ CLI 输入 topic ID、vault address 和 correlation ID，输出逐项状态、re
 4. 为最终录制准备一个新的 Active Vault：未来 deadline、足够两次动作的 principal、足够一次 slash 的 operator stake；旧 Vault 只用于排练。
 
 Gate 失败即停止前端开发，先修真实链路。通过证据是一条 CLI normal run 的 R1-R5 全部 `VERIFIED`，以及 HashScan/HCS/Graph/x402 的公开引用。
+
+状态：核心真实性 Gate 已通过。2026-09-11 生成 correlation `live-1789115733718`；Graph 双重重放 hash 为 `0x41f0335a7f2c684a2787551cab656b9aab0dc2bde2af885a5516d1c4f2f71e72`，Vault transaction 为 `0xcf68d70dd76703012c86d5f513831f8df8cc6f660617fd375aed8db5f44f1023`，Blocky402 settlement 为 `0.0.7162784@1789115709.735632430`，独立 CLI 的 R1-R5 全部 `VERIFIED`。最终 AI normal/forged 录制仍需新建一次性 Vault。
 
 ### S6.1 最小可复用工作流（3 小时）
 

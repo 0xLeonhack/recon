@@ -136,6 +136,7 @@ Live instance used by the demo (all values public — no keys in this repository
 | Vault principal | funded 4 HBAR — tx [`0x5c5eec8f…331a2a41c`](https://hashscan.io/testnet/transaction/0x5c5eec8fbd7d61035722e4c53d4a6aae36734cee83660946f1f7ddb331a2a41c) |
 | Operator stake | funded 2 HBAR — tx [`0x5db307ea…d0c55d1956`](https://hashscan.io/testnet/transaction/0x5db307eaa529bf58d0d51d59b1e59316c821a63b5fdaf4d6c7fc45d0c55d1956) |
 | Pinned Graph target | official Uniswap V3 deployment `QmTZ8ejXJxRo7vDBS4uwqBeGoxLSWbhaA7oXa1RvxunLy7`, Ethereum mainnet block `25946145`; double-replay hash `0x41f0335a…4f2f71e72` (matched twice) |
+| Latest fully verified run | correlation `live-1789115733718`; R1-R5 `VERIFIED`; vault tx [`0xcf68d70d…f44f1023`](https://hashscan.io/testnet/transaction/0xcf68d70dd76703012c86d5f513831f8df8cc6f660617fd375aed8db5f44f1023); settlement [`0.0.7162784@1789115709.735632430`](https://hashscan.io/testnet/transaction/0.0.7162784-1789115709-735632430) |
 
 ## Status — what is proven vs in progress
 
@@ -148,8 +149,9 @@ No mock is presented as live evidence. Per-evidence tracking: [`docs/ROADMAP.md`
 | HCS evidence timeline | ✅ topic live; publish path exercised by `run:live` |
 | Blocky402 facilitator discovery + 402 contract | ✅ verified live (`hedera:testnet`, x402 v2) |
 | Hedera testnet RPC | ✅ verified live (chain ID 296) |
-| The Graph double-replay | 🔶 verified live against the official Uniswap V3 deployment; small adapter patch for the network gateway's `_meta` hash semantics pending re-apply |
+| The Graph double-replay | ✅ verified live against the official Uniswap V3 deployment; pinned `_meta.block.hash` is honestly recorded as null when the gateway prunes historical hashes |
 | Real x402 payment loop, live end-to-end run | ✅ verified live end-to-end (`run:live`: Graph query → 402 payment → vault execute → HCS) |
+| Live verifier R1-R5 | ✅ correlation `live-1789115733718` independently replayed from Graph, HCS, Vault and Hedera payment receipt; all five rules `VERIFIED` |
 | Bazantic Recipe wiring, video | ⬜ planned |
 
 ## Stack

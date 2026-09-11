@@ -115,6 +115,23 @@ export function createVaultPublicClient(rpcUrl: string): PublicClient {
   return createPublicClient({ chain: hederaTestnet, transport: http(rpcUrl) });
 }
 
+export async function isRecipientAllowed(
+  publicClient: PublicClient,
+  vaultAddress: string,
+  recipient: string,
+): Promise<boolean> {
+  const address = requireAddress(vaultAddress, 'INVALID_ADDRESS');
+  const recipientAddress = requireAddress(recipient, 'INVALID_ADDRESS');
+  const abi = loadVaultAbi();
+  const allowed = await publicClient.readContract({
+    address,
+    abi,
+    functionName: 'isRecipientAllowed',
+    args: [recipientAddress],
+  });
+  return allowed as boolean;
+}
+
 export async function readVaultState(
   publicClient: PublicClient,
   vaultAddress: string,

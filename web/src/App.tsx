@@ -1,18 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { createDemoSnapshot, type DemoMode } from '../../src/verifier';
+import {
+  ApiError,
+  fetchMandate,
+  killVault,
+  runDemo,
+  slashDemo,
+  type DemoMode,
+  type EvidenceEventType,
+  type KillResult,
+  type LiveSnapshot,
+  type MandatePayload,
+  type SlashResult,
+} from './api';
 
 interface EvidenceRowProps {
   readonly label: string;
   readonly value: string;
-  readonly tone?: 'default' | 'positive';
+  readonly tone?: 'default' | 'positive' | 'negative';
 }
 
 function EvidenceRow({ label, value, tone = 'default' }: EvidenceRowProps) {
   return (
     <div className="evidence-row">
       <dt>{label}</dt>
-      <dd className={tone === 'positive' ? 'value-positive' : undefined} title={value}>
+      <dd
+        className={
+          tone === 'positive'
+            ? 'value-positive'
+            : tone === 'negative'
+              ? 'value-negative'
+              : undefined
+        }
+        title={value}
+      >
         {value}
       </dd>
     </div>
@@ -29,24 +50,92 @@ function PixelMark() {
   );
 }
 
-const timelineLabels = {
+const timelineLabels: Readonly<Record<EvidenceEventType, string>> = {
   DATA_QUERY: 'Data query',
   API_PAYMENT: 'API payment',
   RATIONALE: 'Rationale',
   ACTION_PROPOSED: 'Proposed',
   ACTION_EXECUTED: 'Executed',
-} as const;
+};
+
+function formatDeadline(unixSeconds: string): string {
+  const numeric = Number(unixSeconds);
+  if (!Number.isFinite(numeric)) return unixSeconds;
+  return new Date(numeric * 1000).toISOString();
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.code;
+  if (error instanceof Error) return error.message;
+  return 'unknown_error';
+}
 
 export function App() {
   const [mode, setMode] = useState<DemoMode>('normal');
-  const snapshot = createDemoSnapshot(mode);
-  const isVerified = snapshot.report.status === 'VERIFIED';
-  const verifiedCount = snapshot.report.findings.filter(
-    (finding) => finding.status === 'VERIFIED',
-  ).length;
+  const [mandate, setMandate] = useState<MandatePayload | null>(null);
+  const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
+  const [slashResult, setSlashResult] = useState<SlashResult | null>(null);
+  const [killResult, setKillResult] = useState<KillResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetchMandate()
+      .then(setMandate)
+      .catch((err: unknown) => setError(errorMessage(err)));
+  }, []);
+
+  const vaultStatus = snapshot?.vault.status ?? mandate?.status ?? 'Loading';
+  const isMismatch = snapshot?.report.status === 'MISMATCH';
+  const canFreeze =
+    (snapshot?.vault.status ?? (mandate?.status as 'Active' | 'Frozen' | 'Closed')) === 'Active';
+
+  async function handleRun() {
+    setBusy(true);
+    setError(null);
+    setSlashResult(null);
+    setKillResult(null);
+    try {
+      const result = await runDemo(mode);
+      setSnapshot(result);
+      setMandate(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSlash() {
+    if (snapshot === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setSlashResult(await slashDemo(snapshot.correlationId));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleKill() {
+    setBusy(true);
+    setError(null);
+    try {
+      setKillResult(await killVault());
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const verifiedCount =
+    snapshot?.report.findings.filter((finding) => finding.status === 'VERIFIED').length ?? 0;
 
   return (
-    <main className={`app app--${snapshot.report.status.toLowerCase()}`}>
+    <main className={`app app--${(snapshot?.report.status ?? 'pending').toLowerCase()}`}>
       <div className="shell">
         <header className="topbar">
           <a className="brand" href="#top" aria-label="RECON home">
@@ -59,9 +148,9 @@ export function App() {
 
           <div className="environment">
             <span className="live-dot" />
-            <span>Core ready</span>
+            <span>Vault {vaultStatus}</span>
             <span className="environment-divider" aria-hidden="true" />
-            <span>{snapshot.source.replace('_', ' ')}</span>
+            <span>Hedera testnet</span>
           </div>
         </header>
 
@@ -77,6 +166,7 @@ export function App() {
                 type="button"
                 aria-pressed={mode === 'normal'}
                 onClick={() => setMode('normal')}
+                disabled={busy}
               >
                 <span aria-hidden="true">01</span>
                 Normal run
@@ -85,6 +175,7 @@ export function App() {
                 type="button"
                 aria-pressed={mode === 'forged'}
                 onClick={() => setMode('forged')}
+                disabled={busy}
               >
                 <span aria-hidden="true">02</span>
                 Forged hash
@@ -94,151 +185,234 @@ export function App() {
 
           <div className="run-meta">
             <span>Correlation ID</span>
-            <code>{snapshot.correlationId}</code>
-            <span className="run-meta-tag">Deterministic replay</span>
+            <code>{snapshot?.correlationId ?? 'awaiting run'}</code>
+            <button
+              type="button"
+              className="run-button"
+              onClick={() => void handleRun()}
+              disabled={busy}
+            >
+              {busy ? 'Running…' : `Run ${mode}`}
+            </button>
+          </div>
+
+          <div className="action-bar">
+            <button
+              type="button"
+              className="action-button action-button--slash"
+              onClick={() => void handleSlash()}
+              disabled={!isMismatch || busy || slashResult !== null}
+            >
+              Slash stake
+            </button>
+            <button
+              type="button"
+              className="action-button action-button--kill"
+              onClick={() => void handleKill()}
+              disabled={!canFreeze || busy}
+            >
+              Freeze vault
+            </button>
           </div>
         </section>
 
-        <section className="result-hero" aria-live="polite">
-          <div className="status-glyph" aria-hidden="true">
-            {isVerified ? 'OK' : '!!'}
-          </div>
-          <div className="result-copy">
-            <p className="kicker">Verification result</p>
-            <h2>{snapshot.report.status}</h2>
-            <p>
-              {isVerified
-                ? 'Claims reconcile with the replayed data and execution timeline.'
-                : 'The claimed response hash does not match the deterministic replay.'}
-            </p>
-          </div>
-          <dl className="result-stats">
-            <div>
-              <dt>Rules passed</dt>
-              <dd>
-                {verifiedCount}
-                <span>/{snapshot.report.findings.length}</span>
-              </dd>
-            </div>
-            <div>
-              <dt>Evidence events</dt>
-              <dd>{snapshot.timeline.length}</dd>
-            </div>
-          </dl>
-        </section>
+        {error !== null && (
+          <section className="banner banner--error" role="alert">
+            <code>{error}</code>
+          </section>
+        )}
 
-        <section className="reconciliation" aria-label="Reconciliation evidence">
-          <article className="evidence-panel evidence-panel--claimed">
+        {mandate !== null && snapshot === null && (
+          <section className="mandate" aria-label="Vault mandate">
             <header className="panel-header">
-              <span className="panel-index">01</span>
+              <span className="panel-index">00</span>
               <div>
-                <p>Agent assertion</p>
-                <h2>Claimed</h2>
+                <p>Onchain state</p>
+                <h2>Mandate</h2>
               </div>
-              <span className="panel-source">HCS</span>
+              <span className="panel-source">PolicyVault</span>
             </header>
             <dl>
-              <EvidenceRow label="Deployment" value={snapshot.claimed.deploymentId} />
-              <EvidenceRow label="Final block" value={snapshot.claimed.blockNumber} />
-              <EvidenceRow label="Response hash" value={snapshot.claimed.responseHash} />
-            </dl>
-          </article>
-
-          <article className="evidence-panel evidence-panel--actual">
-            <header className="panel-header">
-              <span className="panel-index">02</span>
-              <div>
-                <p>Onchain event</p>
-                <h2>Actual</h2>
-              </div>
-              <span className="panel-source">Hedera</span>
-            </header>
-            <dl>
-              <EvidenceRow label="Recipient" value={snapshot.actual.recipient} />
-              <EvidenceRow label="Amount" value={`${snapshot.actual.amountTinybar} tinybar`} />
-              <EvidenceRow label="Transaction" value={snapshot.actual.transactionRef} />
-            </dl>
-          </article>
-
-          <article className="evidence-panel evidence-panel--allowed">
-            <header className="panel-header">
-              <span className="panel-index">03</span>
-              <div>
-                <p>Vault mandate</p>
-                <h2>Allowed</h2>
-              </div>
-              <span className="panel-source">Policy</span>
-            </header>
-            <dl>
+              <EvidenceRow label="Status" value={mandate.status} />
+              <EvidenceRow label="Budget cap" value={`${mandate.budgetCapTinybar} tinybar`} />
+              <EvidenceRow label="Deadline" value={formatDeadline(mandate.deadlineUnixSeconds)} />
+              <EvidenceRow label="Spent" value={`${mandate.spentTinybar} tinybar`} />
+              <EvidenceRow label="Principal" value={`${mandate.principalBalanceTinybar} tinybar`} />
+              <EvidenceRow label="Stake" value={`${mandate.stakeBalanceTinybar} tinybar`} />
               <EvidenceRow
-                label="Recipient"
-                value={snapshot.allowed.recipientAllowed ? 'ALLOW' : 'DENY'}
-                tone={snapshot.allowed.recipientAllowed ? 'positive' : 'default'}
+                label="Recipient allowed"
+                value={mandate.recipientAllowed ? 'ALLOW' : 'DENY'}
+                tone={mandate.recipientAllowed ? 'positive' : 'negative'}
               />
-              <EvidenceRow
-                label="Budget cap"
-                value={`${snapshot.allowed.budgetCapTinybar} tinybar`}
-              />
-              <EvidenceRow label="Deadline" value={snapshot.allowed.deadline} />
             </dl>
-          </article>
-        </section>
+          </section>
+        )}
 
-        <section className="audit-log" aria-labelledby="audit-title">
-          <header className="section-heading">
-            <div>
-              <p className="kicker">Shared verifier core</p>
-              <h2 id="audit-title">Rule output</h2>
-            </div>
-            <span>{snapshot.report.findings.length.toString().padStart(2, '0')} checks</span>
-          </header>
+        {snapshot !== null && (
+          <>
+            <section className="result-hero" aria-live="polite">
+              <div className="status-glyph" aria-hidden="true">
+                {snapshot.report.status === 'VERIFIED' ? 'OK' : '!!'}
+              </div>
+              <div className="result-copy">
+                <p className="kicker">Verification result</p>
+                <h2>{snapshot.report.status}</h2>
+                <p>
+                  {snapshot.report.status === 'VERIFIED'
+                    ? 'Claims reconcile with the replayed data and execution timeline.'
+                    : snapshot.report.status === 'MISMATCH'
+                      ? 'The claimed response hash does not match the deterministic replay.'
+                      : 'The verification pipeline could not reach a clean verdict.'}
+                </p>
+              </div>
+              <dl className="result-stats">
+                <div>
+                  <dt>Rules passed</dt>
+                  <dd>
+                    {verifiedCount}
+                    <span>/{snapshot.report.findings.length}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Evidence events</dt>
+                  <dd>{snapshot.timeline.length}</dd>
+                </div>
+              </dl>
+            </section>
 
-          <div className="findings">
-            {snapshot.report.findings.map((finding) => (
-              <article className="finding" key={`${finding.rule}:${finding.reasonCode}`}>
-                <div className="finding-rule">
-                  <code>{finding.rule}</code>
-                  <span
-                    className={`finding-status finding-status--${finding.status.toLowerCase()}`}
-                  >
-                    {finding.status}
-                  </span>
-                </div>
-                <div className="finding-copy">
-                  <strong>{finding.reasonCode}</strong>
-                  <p>{finding.message}</p>
-                </div>
-                <div className="source-refs">
-                  <span>Source refs</span>
-                  {finding.sourceRefs.length > 0 ? (
-                    finding.sourceRefs.map((sourceRef) => <code key={sourceRef}>{sourceRef}</code>)
-                  ) : (
-                    <code>internal:timeline</code>
-                  )}
-                </div>
+            <section className="reconciliation" aria-label="Reconciliation evidence">
+              <article className="evidence-panel evidence-panel--claimed">
+                <header className="panel-header">
+                  <span className="panel-index">01</span>
+                  <div>
+                    <p>Agent assertion</p>
+                    <h2>Claimed</h2>
+                  </div>
+                  <span className="panel-source">HCS</span>
+                </header>
+                <dl>
+                  <EvidenceRow label="Deployment" value={snapshot.claimed.deploymentId} />
+                  <EvidenceRow label="Final block" value={snapshot.claimed.blockNumber} />
+                  <EvidenceRow label="Response hash" value={snapshot.claimed.responseHash} />
+                </dl>
               </article>
-            ))}
-          </div>
-        </section>
 
-        <section className="timeline" aria-labelledby="timeline-title">
-          <header className="section-heading section-heading--compact">
-            <div>
-              <p className="kicker">Correlation sequence</p>
-              <h2 id="timeline-title">Evidence timeline</h2>
-            </div>
-            <span>HCS ordered</span>
-          </header>
-          <ol>
-            {snapshot.timeline.map((event, index) => (
-              <li key={event.eventId}>
-                <span className="timeline-node">{(index + 1).toString().padStart(2, '0')}</span>
-                <strong>{timelineLabels[event.type]}</strong>
-                <code>{event.eventId}</code>
-              </li>
-            ))}
-          </ol>
-        </section>
+              <article className="evidence-panel evidence-panel--actual">
+                <header className="panel-header">
+                  <span className="panel-index">02</span>
+                  <div>
+                    <p>Onchain event</p>
+                    <h2>Actual</h2>
+                  </div>
+                  <span className="panel-source">Hedera</span>
+                </header>
+                <dl>
+                  <EvidenceRow label="Recipient" value={snapshot.actual.recipient} />
+                  <EvidenceRow label="Amount" value={`${snapshot.actual.amountTinybar} tinybar`} />
+                  <EvidenceRow label="Transaction" value={snapshot.actual.transactionRef} />
+                </dl>
+              </article>
+
+              <article className="evidence-panel evidence-panel--allowed">
+                <header className="panel-header">
+                  <span className="panel-index">03</span>
+                  <div>
+                    <p>Vault mandate</p>
+                    <h2>Allowed</h2>
+                  </div>
+                  <span className="panel-source">Policy</span>
+                </header>
+                <dl>
+                  <EvidenceRow
+                    label="Recipient"
+                    value={snapshot.allowed.recipientAllowed ? 'ALLOW' : 'DENY'}
+                    tone={snapshot.allowed.recipientAllowed ? 'positive' : 'negative'}
+                  />
+                  <EvidenceRow
+                    label="Budget cap"
+                    value={`${snapshot.allowed.budgetCapTinybar} tinybar`}
+                  />
+                  <EvidenceRow label="Deadline" value={snapshot.allowed.deadline} />
+                </dl>
+              </article>
+            </section>
+
+            <section className="audit-log" aria-labelledby="audit-title">
+              <header className="section-heading">
+                <div>
+                  <p className="kicker">Shared verifier core</p>
+                  <h2 id="audit-title">Rule output</h2>
+                </div>
+                <span>{snapshot.report.findings.length.toString().padStart(2, '0')} checks</span>
+              </header>
+
+              <div className="findings">
+                {snapshot.report.findings.map((finding) => (
+                  <article className="finding" key={`${finding.rule}:${finding.reasonCode}`}>
+                    <div className="finding-rule">
+                      <code>{finding.rule}</code>
+                      <span
+                        className={`finding-status finding-status--${finding.status.toLowerCase()}`}
+                      >
+                        {finding.status}
+                      </span>
+                    </div>
+                    <div className="finding-copy">
+                      <strong>{finding.reasonCode}</strong>
+                      <p>{finding.message}</p>
+                    </div>
+                    <div className="source-refs">
+                      <span>Source refs</span>
+                      {finding.sourceRefs.length > 0 ? (
+                        finding.sourceRefs.map((sourceRef) => (
+                          <code key={sourceRef}>{sourceRef}</code>
+                        ))
+                      ) : (
+                        <code>internal:timeline</code>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="timeline" aria-labelledby="timeline-title">
+              <header className="section-heading section-heading--compact">
+                <div>
+                  <p className="kicker">Correlation sequence</p>
+                  <h2 id="timeline-title">Evidence timeline</h2>
+                </div>
+                <span>HCS ordered</span>
+              </header>
+              <ol>
+                {snapshot.timeline.map((event, index) => (
+                  <li key={event.eventId}>
+                    <span className="timeline-node">{(index + 1).toString().padStart(2, '0')}</span>
+                    <strong>{timelineLabels[event.type]}</strong>
+                    <code>{event.eventId}</code>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </>
+        )}
+
+        {(slashResult !== null || killResult !== null) && (
+          <section className="banner banner--result" aria-live="polite">
+            {slashResult !== null && (
+              <p>
+                Slash settled: stake {slashResult.stakeBefore} → {slashResult.stakeAfter} tinybar (
+                <code>{slashResult.txHash}</code>)
+              </p>
+            )}
+            {killResult !== null && (
+              <p>
+                Vault frozen: {killResult.vaultStateAfter.status} (
+                <code>{killResult.killSwitch.txHash}</code>)
+              </p>
+            )}
+          </section>
+        )}
 
         <footer>
           <span>RECON / ETHONLINE 2026</span>

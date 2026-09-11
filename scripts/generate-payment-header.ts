@@ -1,111 +1,48 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { loadEnvFile } from 'node:process';
 import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
 
-import {
-  AccountId,
-  Client,
-  Hbar,
-  PrivateKey,
-  TransactionId,
-  TransferTransaction,
-} from '@hashgraph/sdk';
-
-import {
-  DEFAULT_BLOCKY402_TESTNET_URL,
-  discoverHederaX402Support,
-} from '../src/adapters/blocky402';
-import { VERIFY_QUERY_PRICE_TINYBAR_DEFAULT } from '../src/api/verify-query';
+import { discoverHederaX402Support } from '../src/adapters/blocky402';
+import { createPaymentHeader, loadDemoConfig, type DemoConfig } from '../src/demo';
 
 /**
- * Generates a single-use x402 payment header for the live demo (path A: the
- * agent pays out-of-band by signing a fee-sponsored Hedera transfer, and the
- * resulting header is written to .env as X402_PAYMENT_HEADER).
- *
- * The `accepted` object must mirror buildRequirements in verify-query.ts
- * byte-for-byte, otherwise Blocky402 rejects the header on /verify.
+ * Generates a single-use x402 payment header for the agent identity (thin
+ * wrapper over src/demo/payment.ts). The header is printed to stdout; the live
+ * runner generates the same header in memory, so this is a standalone probe.
  */
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.trim().length === 0) {
-    throw new Error(`Missing required environment variable ${name}`);
+function errorCode(error: unknown): string {
+  if (
+    error instanceof Error &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code;
   }
-  return value.trim();
+  return error instanceof Error ? error.name : 'UNKNOWN';
 }
 
-const ENV_PATH = resolve('.env');
+loadEnvFile(resolve('.env'));
 
-loadEnvFile(ENV_PATH);
-
-const agentAccountId = requireEnv('HEDERA_AGENT_ACCOUNT_ID');
-const agentKey = PrivateKey.fromStringECDSA(
-  requireEnv('HEDERA_AGENT_PRIVATE_KEY').replace(/^0x/, ''),
-);
-const payTo = requireEnv('X402_VERIFY_PAYTO');
-const resource = requireEnv('X402_VERIFY_RESOURCE');
-const amount = process.env.X402_VERIFY_PRICE_TINYBAR ?? VERIFY_QUERY_PRICE_TINYBAR_DEFAULT;
-const facilitatorBaseUrl = process.env.BLOCKY402_BASE_URL ?? DEFAULT_BLOCKY402_TESTNET_URL;
-
-const { feePayer } = await discoverHederaX402Support(facilitatorBaseUrl);
-
-const client = Client.forTestnet();
-const tx = new TransferTransaction()
-  .setTransactionId(TransactionId.generate(AccountId.fromString(feePayer)))
-  .addHbarTransfer(AccountId.fromString(agentAccountId), Hbar.fromTinybars(`-${amount}`))
-  .addHbarTransfer(AccountId.fromString(payTo), Hbar.fromTinybars(amount))
-  .freezeWith(client);
-const signed = await tx.sign(agentKey);
-const txBase64 = Buffer.from(signed.toBytes()).toString('base64');
-client.close();
-
-const accepted = {
-  scheme: 'exact',
-  network: 'hedera:testnet',
-  x402Version: 2,
-  payTo,
-  asset: '0.0.0',
-  amount,
-  resource,
-  maxTimeoutSeconds: 60,
-  extra: { feePayer },
-};
-const header = Buffer.from(
-  JSON.stringify({
-    x402Version: 2,
-    resource: { url: resource },
-    accepted,
-    payload: { transaction: txBase64 },
-  }),
-).toString('base64');
-
-const verifyResponse = await fetch(`${facilitatorBaseUrl}/verify`, {
-  method: 'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ x402Version: 2, paymentHeader: header, paymentRequirements: accepted }),
-});
-if (!verifyResponse.ok) {
-  throw new Error(`Facilitator /verify rejected the header (HTTP ${verifyResponse.status})`);
+let config: DemoConfig;
+try {
+  config = loadDemoConfig(process.env);
+} catch (error) {
+  console.error(JSON.stringify({ status: 'UNVERIFIABLE', reason: errorCode(error) }));
+  process.exit(1);
 }
 
-const envContents = await readFile(ENV_PATH, 'utf8');
-const line = `X402_PAYMENT_HEADER=${header}`;
-const pattern = /^X402_PAYMENT_HEADER=.*$/m;
-const updated = pattern.test(envContents)
-  ? envContents.replace(pattern, line)
-  : `${envContents.replace(/\n?$/, '\n')}${line}\n`;
-await writeFile(ENV_PATH, updated, { encoding: 'utf8', mode: 0o600 });
+const support = await discoverHederaX402Support(config.facilitatorBaseUrl);
+const header = await createPaymentHeader({ ...config, feePayer: support.feePayer });
 
 console.log(
   JSON.stringify(
     {
       status: 'PAYMENT_HEADER_GENERATED',
-      feePayer,
-      payer: agentAccountId,
-      payTo,
-      amountTinybar: amount,
-      verifiedByFacilitator: true,
-      envFile: '.env',
+      feePayer: support.feePayer,
+      payer: config.agentAccountId,
+      payTo: config.payTo,
+      amountTinybar: config.priceTinybar,
+      header,
     },
     null,
     2,

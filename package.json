@@ -22,6 +22,7 @@
     "vault:stake": "tsx scripts/deposit-stake.ts",
     "topic:create": "tsx scripts/create-topic.ts",
     "api:start": "tsx scripts/serve-api.ts",
+    "demo:start": "tsx scripts/serve-demo.ts",
     "run:live": "tsx scripts/run-live.ts",
     "pay:header": "tsx scripts/generate-payment-header.ts",
     "demo:verify": "tsx scripts/verify-demo.ts",

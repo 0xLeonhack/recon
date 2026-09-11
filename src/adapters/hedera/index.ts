@@ -9,6 +9,7 @@ export {
   decodeVaultLog,
   executeVaultAction,
   HederaVaultError,
+  isRecipientAllowed,
   loadVaultAbi,
   readVaultActions,
   readVaultState,

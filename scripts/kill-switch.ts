@@ -1,109 +1,53 @@
-import { getAddress, keccak256, toBytes } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, http } from 'viem';
+import { resolve } from 'node:path';
+import { loadEnvFile } from 'node:process';
 
-import {
-  createVaultPublicClient,
-  DEFAULT_HEDERA_TESTNET_RPC_URL,
-  executeVaultAction,
-  hederaTestnet,
-  loadVaultAbi,
-  readVaultState,
-} from '../src/adapters/hedera';
+import { kill, KillError, loadDemoConfig, type DemoConfig } from '../src/demo';
 
 /**
- * Kill-switch demo (PRD F7): the owner freezes the vault, then the agent's
- * next action is recorded as a rejection (NotActive) instead of reverting.
- *
- * Requires owner + agent credentials.
+ * Kill-switch demo (thin wrapper over src/demo/kill.ts): the owner freezes the
+ * vault, then the agent's next action is recorded as a rejection (NotActive).
  */
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.trim().length === 0) {
-    console.error(JSON.stringify({ status: 'UNVERIFIABLE', reason: `MISSING_${name}` }));
-    process.exit(1);
+function errorCode(error: unknown): string {
+  if (
+    error instanceof Error &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'string'
+  ) {
+    return (error as { code: string }).code;
   }
-  return value.trim();
+  return error instanceof Error ? error.name : 'UNKNOWN';
 }
 
-const vaultAddress = requireEnv('VAULT_ADDRESS');
-const ownerKey = requireEnv('HEDERA_OWNER_PRIVATE_KEY');
-const agentKey = requireEnv('HEDERA_AGENT_PRIVATE_KEY');
-const recipient = requireEnv('VAULT_RECIPIENT');
-const rpcUrl = process.env.HEDERA_RPC_URL ?? DEFAULT_HEDERA_TESTNET_RPC_URL;
+loadEnvFile(resolve('.env'));
 
-const publicClient = createVaultPublicClient(rpcUrl);
-const abi = loadVaultAbi();
-
-// 1. Owner freezes the vault.
-const ownerAccount = privateKeyToAccount(ownerKey as `0x${string}`);
-const onChainOwner = (await publicClient.readContract({
-  address: vaultAddress as `0x${string}`,
-  abi,
-  functionName: 'owner',
-})) as string;
-if (getAddress(onChainOwner) !== ownerAccount.address) {
-  console.error(
-    JSON.stringify({
-      status: 'UNVERIFIABLE',
-      reason: `HEDERA_OWNER_PRIVATE_KEY does not match vault owner ${onChainOwner}`,
-    }),
-  );
-  process.exit(1);
-}
-const ownerWallet = createWalletClient({
-  account: ownerAccount,
-  chain: hederaTestnet,
-  transport: http(rpcUrl),
-});
-const reasonHash = keccak256(toBytes(`kill-switch:${vaultAddress}`));
-const killHash = await ownerWallet.writeContract({
-  address: vaultAddress as `0x${string}`,
-  abi,
-  functionName: 'kill' as const,
-  args: [reasonHash],
-  account: ownerAccount,
-  chain: hederaTestnet,
-});
-const killReceipt = await publicClient.waitForTransactionReceipt({ hash: killHash });
-if (killReceipt.status !== 'success') {
-  console.error(JSON.stringify({ status: 'UNVERIFIABLE', reason: 'KILL_TX_FAILED' }));
+let config: DemoConfig;
+try {
+  config = loadDemoConfig(process.env);
+} catch (error) {
+  console.error(JSON.stringify({ status: 'UNVERIFIABLE', reason: errorCode(error) }));
   process.exit(1);
 }
 
-// 2. The agent's next action must be rejected on-chain (NotActive), not revert.
-const attempt = await executeVaultAction(
-  { rpcUrl, vaultAddress, agentPrivateKey: agentKey },
-  {
-    evidenceId: keccak256(toBytes(`post-kill:${Date.now()}`)),
-    recipient: recipient as `0x${string}`,
-    amount: 1n,
-  },
-);
-
-if (attempt.executed) {
-  console.error(
-    JSON.stringify({
-      status: 'MISMATCH',
-      reason: 'EXECUTED_AFTER_KILL',
-      txHash: attempt.txHash,
-    }),
+try {
+  const result = await kill(config);
+  console.log(
+    JSON.stringify(
+      {
+        status: 'VERIFIED',
+        killSwitch: result.killSwitch,
+        agentAttempt: result.agentAttempt,
+        vaultStateAfter: result.vaultStateAfter,
+      },
+      null,
+      2,
+    ),
   );
-  process.exitCode = 2;
-  process.exit(2);
+} catch (error) {
+  if (error instanceof KillError && error.code === 'EXECUTED_AFTER_KILL') {
+    console.error(JSON.stringify({ status: 'MISMATCH', reason: error.code }));
+    process.exit(2);
+  }
+  console.error(JSON.stringify({ status: 'UNVERIFIABLE', reason: errorCode(error) }));
+  process.exit(1);
 }
-
-const stateAfter = await readVaultState(publicClient, vaultAddress);
-console.log(
-  JSON.stringify(
-    {
-      status: 'VERIFIED',
-      killSwitch: { txHash: killHash, reasonHash },
-      agentAttempt: { txHash: attempt.txHash, rejectionReason: attempt.rejectionReason },
-      vaultStateAfter: stateAfter,
-    },
-    null,
-    2,
-  ),
-);

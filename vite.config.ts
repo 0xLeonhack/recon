@@ -8,4 +8,9 @@ export default defineConfig({
     emptyOutDir: true,
     outDir: '../dist/web',
   },
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:4021',
+    },
+  },
 });

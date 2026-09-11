@@ -80,7 +80,7 @@ Node.js ≥ 22.13.
 
 ```bash
 npm ci
-npm run check        # format + lint + typecheck + 141 unit tests + contract compile + web build
+npm run check        # format + lint + typecheck + 144 unit tests + contract compile + web build
 npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, slash, kill-switch
 ```
 
@@ -121,6 +121,7 @@ npm run web:build && npm run demo:start   # → http://127.0.0.1:4021
 
 - `GET /api/mandate` renders the live vault state (status, budget cap, deadline, spent, balances, recipient allowlist).
 - **Normal run** / **Forged hash** trigger a real run — Graph → x402 payment → DeepSeek rationale → vault execute → 5 HCS events — then show the R1–R5 report.
+- **Live progress** — while a run is in flight the UI polls `/api/run/progress` and renders a six-step stage track (Graph query → Payment → Rationale → Vault execute → Evidence → Verify).
 - **Slash stake** (enabled only when the report is `MISMATCH`) submits the verifier-mediated slash.
 - **Freeze vault** flips the kill switch; the next agent action is rejected `NotActive`.
 
@@ -161,15 +162,15 @@ No mock is presented as live evidence. Per-evidence tracking: [`docs/ROADMAP.md`
 
 | Component | State |
 |---|---|
-| Reconciliation core R1–R5, canonicalization, SHA-256 hashing | ✅ implemented, 141 unit tests |
+| Reconciliation core R1–R5, canonicalization, SHA-256 hashing | ✅ implemented, 144 unit tests |
 | `PolicyVault` (HBAR mandate, stake isolation, slash, kill-switch) | ✅ 7 contract tests; **deployed & funded on testnet** (see above) |
 | HCS evidence timeline | ✅ topic live; publish path exercised by `run:live` |
 | Blocky402 facilitator discovery + 402 contract | ✅ verified live (`hedera:testnet`, x402 v2) |
 | Hedera testnet RPC | ✅ verified live (chain ID 296) |
 | The Graph double-replay | ✅ verified live against the official Uniswap V3 deployment; pinned `_meta.block.hash` is honestly recorded as null when the gateway prunes historical hashes |
 | Real x402 payment loop, live end-to-end run | ✅ verified live end-to-end (`run:live`: Graph query → 402 payment → vault execute → HCS) |
-| Live verifier R1-R5 | ✅ correlation `live-1789115733718` independently replayed from Graph, HCS, Vault and Hedera payment receipt; all five rules `VERIFIED` |
-| DeepSeek V4 Flash decision | 🔶 bounded JSON adapter and deterministic policy integration tested; real model wired into the live loop (`DEEPSEEK_API_KEY` present in `.env`) |
+| Live verifier R1-R5 | ✅ correlation `live-1789126008352` independently replayed from Graph, HCS, Vault and Hedera payment receipt; all five rules `VERIFIED` |
+| DeepSeek V4 Flash decision | ✅ verified live — real `deepseek-v4-flash` produced the bounded EXECUTE_VAULT/STOP choice; recorded in the timeline and gated by the deterministic liquidity policy |
 | Bazantic Recipe wiring, video | ⬜ planned |
 
 ## Stack

@@ -361,6 +361,8 @@ Gate 失败即停止前端开发，先修真实链路。通过证据是一条 CL
 
 页面刷新后只需允许粘贴已完成 correlation ID 并重新验证，不恢复进行中的内存 job。状态不只靠颜色；按钮防重复；长 hash 可读；320/768/1440 px 无页面级溢出。
 
+状态：进行中。`8ae7c80` 增加单路由官网叙事、页内 Demo 锚点和 Frozen/`NotActive` 防误操作；`npm run check` 全绿，Chrome 在 1440px 与模拟 390px 下完成视觉检查，390px `clientWidth === scrollWidth`。当前一次性 Vault 已为 Frozen，正式录制 live normal/forged 前仍需准备新的 Active Vault；owner 钱包签名、证据链接与 correlation ID 重验仍按本节验收项收口。
+
 ### S6.4 验收与录制 Gate（3 小时）
 
 - API 单测：非法 mode/ID、并发 run、重复裁决、VERIFIED 禁止 slash、密钥脱敏和外部超时。

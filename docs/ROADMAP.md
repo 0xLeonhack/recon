@@ -351,7 +351,7 @@ Gate 失败即停止前端开发，先修真实链路。通过证据是一条 CL
 
 ### S6.3 单页用户流程（4 小时）
 
-在现有视觉壳内只实现五段：
+使用单路由纵向页面：首屏展示项目定位、claimed / actual / allowed 模型、证据链和真实集成，通过页内锚点进入现有工作台；不增加独立营销路由。工作台只实现五段：
 
 1. **Live mandate**：连接 owner EIP-1193 钱包；从 `/demo/context` 显示真实 Vault 地址、Active/Frozen、budget、spent、principal、stake、recipient、deadline 和公开交易链接。
 2. **Run agent**：点击一次启动 normal run；时间线显示 Graph query -> x402 payment -> proposal -> vault execution -> HCS publish，每步有 pending/success/error 和真实引用。

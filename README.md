@@ -115,6 +115,8 @@ npm run probe:graph    # double-replay at pinned block (needs GRAPH_API_KEY + de
 
 The browser demo drives the same live loop through one backend process (no browser wallet — slash and freeze are signed server-side with the `.env` keys):
 
+The single-page site introduces the protocol, its claimed / actual / allowed model, evidence flow, and load-bearing integrations before the in-page **Live demo** anchor opens the operational console.
+
 ```bash
 npm run web:build && npm run demo:start   # → http://127.0.0.1:4021
 ```

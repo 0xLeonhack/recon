@@ -188,7 +188,7 @@ type EvidenceEvent = {
 
 状态固定为：`PENDING | VERIFIED | MISMATCH | UNVERIFIABLE | REJECTED`。
 
-- Web 首屏是可操作工作台，不是 landing page 或 fixture viewer。主流程固定为 `Open live mandate -> Run -> Verify -> Respond`。
+- Web 是单路由纵向页面：首屏用项目定位、claimed / actual / allowed 模型和真实集成建立产品上下文，页内锚点向下进入可操作工作台；不是独立营销站或 fixture viewer。Demo 主流程固定为 `Open live mandate -> Run -> Verify -> Respond`。
 - Demo 环境：使用一个在 Hedera testnet 预先部署、注资并存入 operator stake 的一次性 Vault。页面必须从 RPC/mirror node 读取其当前状态并展示部署、注资和 stake 交易链接，不能把静态配置显示成实时状态。
 - 钱包边界：使用浏览器 EIP-1193 provider 连接预部署 Vault 的真实 owner 地址和 Hedera testnet（chain ID 296）。正常运行不需要 owner 签名；kill-switch 由 owner 钱包直接签名。Web 和 Demo 控制器永不接收 owner 私钥。
 - 服务边界：agent、agent operator、verifier 和 HCS 提交身份只存在于本地 Demo 控制器进程；前端只接收公开地址、结构化状态和公开证据引用。控制器只监听 loopback、校验 Origin、一次只运行一个 job，不能接收任意命令、地址、金额、付款头或私钥。

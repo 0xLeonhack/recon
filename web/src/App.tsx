@@ -109,6 +109,7 @@ export function App() {
   }, []);
 
   const vaultStatus = snapshot?.vault.status ?? mandate?.status ?? 'Loading';
+  const isVaultActive = vaultStatus === 'Active';
   const isMismatch = snapshot?.report.status === 'MISMATCH';
   const canFreeze =
     (snapshot?.vault.status ?? (mandate?.status as 'Active' | 'Frozen' | 'Closed')) === 'Active';
@@ -174,323 +175,503 @@ export function App() {
 
   return (
     <main className={`app app--${(snapshot?.report.status ?? 'pending').toLowerCase()}`}>
-      <div className="shell">
-        <header className="topbar">
-          <a className="brand" href="#top" aria-label="RECON home">
-            <PixelMark />
-            <span>
-              <strong>RECON</strong>
-              <small>Agent accountability protocol</small>
-            </span>
-          </a>
-
-          <div className="environment">
-            <span className="live-dot" />
-            <span>Vault {vaultStatus}</span>
-            <span className="environment-divider" aria-hidden="true" />
-            <span>Hedera testnet</span>
-          </div>
-        </header>
-
-        <section className="workspace" id="top" aria-labelledby="workspace-title">
-          <div className="workspace-heading">
-            <div>
-              <p className="kicker">Mandate / Reconciliation</p>
-              <h1 id="workspace-title">Evidence console</h1>
-            </div>
-
-            <div className="segmented-control" aria-label="Evidence mode">
-              <button
-                type="button"
-                aria-pressed={mode === 'normal'}
-                onClick={() => setMode('normal')}
-                disabled={busy}
-              >
-                <span aria-hidden="true">01</span>
-                Normal run
-              </button>
-              <button
-                type="button"
-                aria-pressed={mode === 'forged'}
-                onClick={() => setMode('forged')}
-                disabled={busy}
-              >
-                <span aria-hidden="true">02</span>
-                Forged hash
-              </button>
-            </div>
-          </div>
-
-          <div className="run-meta">
-            <span>Correlation ID</span>
-            <code>{snapshot?.correlationId ?? 'awaiting run'}</code>
-            <button
-              type="button"
-              className="run-button"
-              onClick={() => void handleRun()}
-              disabled={busy}
-            >
-              {busy ? 'Running…' : `Run ${mode}`}
-            </button>
-          </div>
-
-          <div className="action-bar">
-            <button
-              type="button"
-              className="action-button action-button--slash"
-              onClick={() => void handleSlash()}
-              disabled={!isMismatch || busy || slashResult !== null}
-            >
-              Slash stake
-            </button>
-            <button
-              type="button"
-              className="action-button action-button--kill"
-              onClick={() => void handleKill()}
-              disabled={!canFreeze || busy}
-            >
-              Freeze vault
-            </button>
-          </div>
-        </section>
-
-        {running && (
-          <section className="progress" aria-label="Run progress" aria-live="polite">
-            <header className="progress-head">
-              <div>
-                <p className="kicker">Live pipeline</p>
-                <h2>{STAGE_LABELS[progressStage]}</h2>
-              </div>
+      <section className="site-hero" id="home" aria-labelledby="hero-title">
+        <div className="site-hero__media" aria-hidden="true" />
+        <div className="site-hero__inner">
+          <nav className="site-nav" aria-label="Primary navigation">
+            <a className="brand" href="#home" aria-label="RECON home">
+              <PixelMark />
               <span>
-                {currentStepIndex + 1} / {RUN_STAGES.length}
+                <strong>RECON</strong>
+                <small>Agent accountability protocol</small>
               </span>
-            </header>
-            <ol className="progress-track">
-              {RUN_STAGES.map((stage, index) => {
-                const state =
-                  index < currentStepIndex
-                    ? 'is-done'
-                    : index === currentStepIndex
-                      ? 'is-active'
-                      : 'is-pending';
-                return (
-                  <li
-                    key={stage}
-                    className={state}
-                    aria-current={index === currentStepIndex ? 'step' : undefined}
-                  >
-                    <span className="progress-node">{(index + 1).toString().padStart(2, '0')}</span>
-                    <span>{STAGE_LABELS[stage]}</span>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-        )}
+            </a>
 
-        {error !== null && (
-          <section className="banner banner--error" role="alert">
-            <code>{error}</code>
-          </section>
-        )}
+            <div className="site-nav__links">
+              <a href="#protocol">Protocol</a>
+              <a href="#evidence">Evidence</a>
+              <a href="#demo">Live demo</a>
+              <a href="https://github.com/0xLeonhack/recon" target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+            </div>
+          </nav>
 
-        {mandate !== null && snapshot === null && (
-          <section className="mandate" aria-label="Vault mandate">
-            <header className="panel-header">
-              <span className="panel-index">00</span>
+          <div className="hero-copy">
+            <p className="hero-eyebrow">Mandate reconciliation for autonomous agents</p>
+            <h1 className="hero-title" id="hero-title">
+              RECON
+            </h1>
+            <p className="hero-statement">Verify the leash actually holds.</p>
+            <p className="hero-detail">
+              Reconcile what an AI agent claimed, what happened onchain, and what its mandate
+              allowed. Every mismatch becomes independently replayable evidence.
+            </p>
+            <div className="hero-actions">
+              <a className="hero-action hero-action--primary" href="#demo">
+                Open live console
+              </a>
+              <a className="hero-action hero-action--secondary" href="#protocol">
+                Explore protocol
+              </a>
+            </div>
+          </div>
+
+          <ul className="hero-proofline" aria-label="Live integrations">
+            <li>Hedera testnet</li>
+            <li>The Graph replay</li>
+            <li>x402 settlement</li>
+            <li>HCS evidence</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="protocol-section" id="protocol" aria-labelledby="protocol-title">
+        <div className="site-shell">
+          <header className="editorial-heading">
+            <p className="kicker">The accountability gap</p>
+            <h2 id="protocol-title">Permissions control actions. RECON verifies the story.</h2>
+            <p>
+              Budgets and allowlists can stop some bad transactions. They cannot prove that an agent
+              reported every action, used the data it claimed, or stayed inside the mandate that was
+              active when it executed.
+            </p>
+          </header>
+
+          <div className="truth-grid" aria-label="Reconciliation model">
+            <article>
+              <span>01 / Agent assertion</span>
+              <h3>Claimed</h3>
+              <p>Queries, payments, rationale, and actions published as canonical hashes.</p>
+              <strong>Source / HCS</strong>
+            </article>
+            <article>
+              <span>02 / Execution truth</span>
+              <h3>Actual</h3>
+              <p>Successful transfers and rejection events read from PolicyVault on Hedera.</p>
+              <strong>Source / Contract events</strong>
+            </article>
+            <article>
+              <span>03 / Policy boundary</span>
+              <h3>Allowed</h3>
+              <p>Budget, recipient allowlist, deadline, roles, and emergency status.</p>
+              <strong>Source / Onchain mandate</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="evidence-section" id="evidence" aria-labelledby="evidence-title">
+        <div className="site-shell evidence-layout">
+          <header className="evidence-intro">
+            <p className="kicker">One correlation ID</p>
+            <h2 id="evidence-title">A complete, replayable trail.</h2>
+            <p>
+              The model can choose a bounded tool and explain why. Deterministic code computes
+              amounts, addresses, hashes, policy decisions, and the final verdict.
+            </p>
+          </header>
+
+          <ol className="protocol-flow">
+            <li>
+              <span>01</span>
               <div>
-                <p>Onchain state</p>
-                <h2>Mandate</h2>
+                <strong>Observe</strong>
+                <p>Query a pinned Graph deployment at a final block.</p>
               </div>
-              <span className="panel-source">PolicyVault</span>
-            </header>
-            <dl>
-              <EvidenceRow label="Status" value={mandate.status} />
-              <EvidenceRow label="Budget cap" value={`${mandate.budgetCapTinybar} tinybar`} />
-              <EvidenceRow label="Deadline" value={formatDeadline(mandate.deadlineUnixSeconds)} />
-              <EvidenceRow label="Spent" value={`${mandate.spentTinybar} tinybar`} />
-              <EvidenceRow label="Principal" value={`${mandate.principalBalanceTinybar} tinybar`} />
-              <EvidenceRow label="Stake" value={`${mandate.stakeBalanceTinybar} tinybar`} />
-              <EvidenceRow
-                label="Recipient allowed"
-                value={mandate.recipientAllowed ? 'ALLOW' : 'DENY'}
-                tone={mandate.recipientAllowed ? 'positive' : 'negative'}
-              />
-            </dl>
+              <code>DATA_QUERY</code>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <strong>Pay and decide</strong>
+                <p>Settle a real x402 request, then apply the deterministic policy.</p>
+              </div>
+              <code>API_PAYMENT</code>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>Execute</strong>
+                <p>PolicyVault enforces budget, recipient, deadline, and freeze onchain.</p>
+              </div>
+              <code>ACTION_EXECUTED</code>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <strong>Reconcile</strong>
+                <p>Replay R1-R5 from Graph, HCS, Vault events, and the payment receipt.</p>
+              </div>
+              <code>VERIFIED / MISMATCH</code>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section className="integration-strip" aria-label="Protocol integrations">
+        <div className="site-shell integration-strip__inner">
+          <p>Load-bearing integrations</p>
+          <ul>
+            <li>
+              <strong>Hedera</strong>
+              <span>PolicyVault / HCS / settlement</span>
+            </li>
+            <li>
+              <strong>The Graph</strong>
+              <span>Pinned data / deterministic replay</span>
+            </li>
+            <li>
+              <strong>DeepSeek</strong>
+              <span>Bounded tool choice / public rationale</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="demo-section" id="demo" aria-labelledby="workspace-title">
+        <div className="shell">
+          <header className="console-topbar">
+            <a className="brand" href="#home" aria-label="Back to RECON home">
+              <PixelMark />
+              <span>
+                <strong>Live console</strong>
+                <small>Prepared testnet vault</small>
+              </span>
+            </a>
+
+            <div className="environment">
+              <span className="live-dot" />
+              <span>Vault {vaultStatus}</span>
+              <span className="environment-divider" aria-hidden="true" />
+              <span>Hedera testnet</span>
+            </div>
+          </header>
+
+          <section className="workspace" aria-labelledby="workspace-title">
+            <div className="workspace-heading">
+              <div>
+                <p className="kicker">Mandate / Reconciliation</p>
+                <h1 id="workspace-title">Evidence console</h1>
+              </div>
+
+              <div className="segmented-control" aria-label="Evidence mode">
+                <button
+                  type="button"
+                  aria-pressed={mode === 'normal'}
+                  onClick={() => setMode('normal')}
+                  disabled={busy || !isVaultActive}
+                >
+                  <span aria-hidden="true">01</span>
+                  Normal run
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === 'forged'}
+                  onClick={() => setMode('forged')}
+                  disabled={busy || !isVaultActive}
+                >
+                  <span aria-hidden="true">02</span>
+                  Forged hash
+                </button>
+              </div>
+            </div>
+
+            <div className="run-meta">
+              <span>Correlation ID</span>
+              <code>{snapshot?.correlationId ?? 'awaiting run'}</code>
+              <button
+                type="button"
+                className="run-button"
+                onClick={() => void handleRun()}
+                disabled={busy || !isVaultActive}
+              >
+                {busy
+                  ? 'Running…'
+                  : !isVaultActive && vaultStatus !== 'Loading'
+                    ? 'Vault frozen'
+                    : `Run ${mode}`}
+              </button>
+            </div>
+
+            <div className="action-bar">
+              <button
+                type="button"
+                className="action-button action-button--slash"
+                onClick={() => void handleSlash()}
+                disabled={!isMismatch || busy || slashResult !== null}
+              >
+                Slash stake
+              </button>
+              <button
+                type="button"
+                className="action-button action-button--kill"
+                onClick={() => void handleKill()}
+                disabled={!canFreeze || busy}
+              >
+                Freeze vault
+              </button>
+            </div>
           </section>
-        )}
 
-        {snapshot !== null && (
-          <>
-            <section className="result-hero" aria-live="polite">
-              <div className="status-glyph" aria-hidden="true">
-                {snapshot.report.status === 'VERIFIED' ? 'OK' : '!!'}
-              </div>
-              <div className="result-copy">
-                <p className="kicker">Verification result</p>
-                <h2>{snapshot.report.status}</h2>
-                <p>
-                  {snapshot.report.status === 'VERIFIED'
-                    ? 'Claims reconcile with the replayed data and execution timeline.'
-                    : snapshot.report.status === 'MISMATCH'
-                      ? 'The claimed response hash does not match the deterministic replay.'
-                      : 'The verification pipeline could not reach a clean verdict.'}
-                </p>
-              </div>
-              <dl className="result-stats">
-                <div>
-                  <dt>Rules passed</dt>
-                  <dd>
-                    {verifiedCount}
-                    <span>/{snapshot.report.findings.length}</span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Evidence events</dt>
-                  <dd>{snapshot.timeline.length}</dd>
-                </div>
-              </dl>
+          {vaultStatus === 'Frozen' && (
+            <section className="banner banner--frozen" role="status">
+              <strong>Kill switch confirmed.</strong>
+              <span>
+                This prepared vault is frozen, so every new agent action is rejected as NotActive.
+                Configure a new Active vault before running another normal or forged scenario.
+              </span>
             </section>
+          )}
 
-            <section className="reconciliation" aria-label="Reconciliation evidence">
-              <article className="evidence-panel evidence-panel--claimed">
-                <header className="panel-header">
-                  <span className="panel-index">01</span>
-                  <div>
-                    <p>Agent assertion</p>
-                    <h2>Claimed</h2>
-                  </div>
-                  <span className="panel-source">HCS</span>
-                </header>
-                <dl>
-                  <EvidenceRow label="Deployment" value={snapshot.claimed.deploymentId} />
-                  <EvidenceRow label="Final block" value={snapshot.claimed.blockNumber} />
-                  <EvidenceRow label="Response hash" value={snapshot.claimed.responseHash} />
-                </dl>
-              </article>
-
-              <article className="evidence-panel evidence-panel--actual">
-                <header className="panel-header">
-                  <span className="panel-index">02</span>
-                  <div>
-                    <p>Onchain event</p>
-                    <h2>Actual</h2>
-                  </div>
-                  <span className="panel-source">Hedera</span>
-                </header>
-                <dl>
-                  <EvidenceRow label="Recipient" value={snapshot.actual.recipient} />
-                  <EvidenceRow label="Amount" value={`${snapshot.actual.amountTinybar} tinybar`} />
-                  <EvidenceRow label="Transaction" value={snapshot.actual.transactionRef} />
-                </dl>
-              </article>
-
-              <article className="evidence-panel evidence-panel--allowed">
-                <header className="panel-header">
-                  <span className="panel-index">03</span>
-                  <div>
-                    <p>Vault mandate</p>
-                    <h2>Allowed</h2>
-                  </div>
-                  <span className="panel-source">Policy</span>
-                </header>
-                <dl>
-                  <EvidenceRow
-                    label="Recipient"
-                    value={snapshot.allowed.recipientAllowed ? 'ALLOW' : 'DENY'}
-                    tone={snapshot.allowed.recipientAllowed ? 'positive' : 'negative'}
-                  />
-                  <EvidenceRow
-                    label="Budget cap"
-                    value={`${snapshot.allowed.budgetCapTinybar} tinybar`}
-                  />
-                  <EvidenceRow label="Deadline" value={snapshot.allowed.deadline} />
-                </dl>
-              </article>
-            </section>
-
-            <section className="audit-log" aria-labelledby="audit-title">
-              <header className="section-heading">
+          {running && (
+            <section className="progress" aria-label="Run progress" aria-live="polite">
+              <header className="progress-head">
                 <div>
-                  <p className="kicker">Shared verifier core</p>
-                  <h2 id="audit-title">Rule output</h2>
+                  <p className="kicker">Live pipeline</p>
+                  <h2>{STAGE_LABELS[progressStage]}</h2>
                 </div>
-                <span>{snapshot.report.findings.length.toString().padStart(2, '0')} checks</span>
+                <span>
+                  {currentStepIndex + 1} / {RUN_STAGES.length}
+                </span>
               </header>
-
-              <div className="findings">
-                {snapshot.report.findings.map((finding) => (
-                  <article className="finding" key={`${finding.rule}:${finding.reasonCode}`}>
-                    <div className="finding-rule">
-                      <code>{finding.rule}</code>
-                      <span
-                        className={`finding-status finding-status--${finding.status.toLowerCase()}`}
-                      >
-                        {finding.status}
+              <ol className="progress-track">
+                {RUN_STAGES.map((stage, index) => {
+                  const state =
+                    index < currentStepIndex
+                      ? 'is-done'
+                      : index === currentStepIndex
+                        ? 'is-active'
+                        : 'is-pending';
+                  return (
+                    <li
+                      key={stage}
+                      className={state}
+                      aria-current={index === currentStepIndex ? 'step' : undefined}
+                    >
+                      <span className="progress-node">
+                        {(index + 1).toString().padStart(2, '0')}
                       </span>
-                    </div>
-                    <div className="finding-copy">
-                      <strong>{finding.reasonCode}</strong>
-                      <p>{finding.message}</p>
-                    </div>
-                    <div className="source-refs">
-                      <span>Source refs</span>
-                      {finding.sourceRefs.length > 0 ? (
-                        finding.sourceRefs.map((sourceRef) => (
-                          <code key={sourceRef}>{sourceRef}</code>
-                        ))
-                      ) : (
-                        <code>internal:timeline</code>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="timeline" aria-labelledby="timeline-title">
-              <header className="section-heading section-heading--compact">
-                <div>
-                  <p className="kicker">Correlation sequence</p>
-                  <h2 id="timeline-title">Evidence timeline</h2>
-                </div>
-                <span>HCS ordered</span>
-              </header>
-              <ol>
-                {snapshot.timeline.map((event, index) => (
-                  <li key={event.eventId}>
-                    <span className="timeline-node">{(index + 1).toString().padStart(2, '0')}</span>
-                    <strong>{timelineLabels[event.type]}</strong>
-                    <code>{event.eventId}</code>
-                  </li>
-                ))}
+                      <span>{STAGE_LABELS[stage]}</span>
+                    </li>
+                  );
+                })}
               </ol>
             </section>
-          </>
-        )}
+          )}
 
-        {(slashResult !== null || killResult !== null) && (
-          <section className="banner banner--result" aria-live="polite">
-            {slashResult !== null && (
-              <p>
-                Slash settled: stake {slashResult.stakeBefore} → {slashResult.stakeAfter} tinybar (
-                <code>{slashResult.txHash}</code>)
-              </p>
-            )}
-            {killResult !== null && (
-              <p>
-                Vault frozen: {killResult.vaultStateAfter.status} (
-                <code>{killResult.killSwitch.txHash}</code>)
-              </p>
-            )}
-          </section>
-        )}
+          {error !== null && (
+            <section className="banner banner--error" role="alert">
+              <code>{error}</code>
+            </section>
+          )}
 
-        <footer>
-          <span>RECON / ETHONLINE 2026</span>
-          <span>Claimed vs actual vs allowed</span>
-        </footer>
-      </div>
+          {mandate !== null && snapshot === null && (
+            <section className="mandate" aria-label="Vault mandate">
+              <header className="panel-header">
+                <span className="panel-index">00</span>
+                <div>
+                  <p>Onchain state</p>
+                  <h2>Mandate</h2>
+                </div>
+                <span className="panel-source">PolicyVault</span>
+              </header>
+              <dl>
+                <EvidenceRow label="Status" value={mandate.status} />
+                <EvidenceRow label="Budget cap" value={`${mandate.budgetCapTinybar} tinybar`} />
+                <EvidenceRow label="Deadline" value={formatDeadline(mandate.deadlineUnixSeconds)} />
+                <EvidenceRow label="Spent" value={`${mandate.spentTinybar} tinybar`} />
+                <EvidenceRow
+                  label="Principal"
+                  value={`${mandate.principalBalanceTinybar} tinybar`}
+                />
+                <EvidenceRow label="Stake" value={`${mandate.stakeBalanceTinybar} tinybar`} />
+                <EvidenceRow
+                  label="Recipient allowed"
+                  value={mandate.recipientAllowed ? 'ALLOW' : 'DENY'}
+                  tone={mandate.recipientAllowed ? 'positive' : 'negative'}
+                />
+              </dl>
+            </section>
+          )}
+
+          {snapshot !== null && (
+            <>
+              <section className="result-hero" aria-live="polite">
+                <div className="status-glyph" aria-hidden="true">
+                  {snapshot.report.status === 'VERIFIED' ? 'OK' : '!!'}
+                </div>
+                <div className="result-copy">
+                  <p className="kicker">Verification result</p>
+                  <h2>{snapshot.report.status}</h2>
+                  <p>
+                    {snapshot.report.status === 'VERIFIED'
+                      ? 'Claims reconcile with the replayed data and execution timeline.'
+                      : snapshot.report.status === 'MISMATCH'
+                        ? 'The claimed response hash does not match the deterministic replay.'
+                        : 'The verification pipeline could not reach a clean verdict.'}
+                  </p>
+                </div>
+                <dl className="result-stats">
+                  <div>
+                    <dt>Rules passed</dt>
+                    <dd>
+                      {verifiedCount}
+                      <span>/{snapshot.report.findings.length}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Evidence events</dt>
+                    <dd>{snapshot.timeline.length}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="reconciliation" aria-label="Reconciliation evidence">
+                <article className="evidence-panel evidence-panel--claimed">
+                  <header className="panel-header">
+                    <span className="panel-index">01</span>
+                    <div>
+                      <p>Agent assertion</p>
+                      <h2>Claimed</h2>
+                    </div>
+                    <span className="panel-source">HCS</span>
+                  </header>
+                  <dl>
+                    <EvidenceRow label="Deployment" value={snapshot.claimed.deploymentId} />
+                    <EvidenceRow label="Final block" value={snapshot.claimed.blockNumber} />
+                    <EvidenceRow label="Response hash" value={snapshot.claimed.responseHash} />
+                  </dl>
+                </article>
+
+                <article className="evidence-panel evidence-panel--actual">
+                  <header className="panel-header">
+                    <span className="panel-index">02</span>
+                    <div>
+                      <p>Onchain event</p>
+                      <h2>Actual</h2>
+                    </div>
+                    <span className="panel-source">Hedera</span>
+                  </header>
+                  <dl>
+                    <EvidenceRow label="Recipient" value={snapshot.actual.recipient} />
+                    <EvidenceRow
+                      label="Amount"
+                      value={`${snapshot.actual.amountTinybar} tinybar`}
+                    />
+                    <EvidenceRow label="Transaction" value={snapshot.actual.transactionRef} />
+                  </dl>
+                </article>
+
+                <article className="evidence-panel evidence-panel--allowed">
+                  <header className="panel-header">
+                    <span className="panel-index">03</span>
+                    <div>
+                      <p>Vault mandate</p>
+                      <h2>Allowed</h2>
+                    </div>
+                    <span className="panel-source">Policy</span>
+                  </header>
+                  <dl>
+                    <EvidenceRow
+                      label="Recipient"
+                      value={snapshot.allowed.recipientAllowed ? 'ALLOW' : 'DENY'}
+                      tone={snapshot.allowed.recipientAllowed ? 'positive' : 'negative'}
+                    />
+                    <EvidenceRow
+                      label="Budget cap"
+                      value={`${snapshot.allowed.budgetCapTinybar} tinybar`}
+                    />
+                    <EvidenceRow label="Deadline" value={snapshot.allowed.deadline} />
+                  </dl>
+                </article>
+              </section>
+
+              <section className="audit-log" aria-labelledby="audit-title">
+                <header className="section-heading">
+                  <div>
+                    <p className="kicker">Shared verifier core</p>
+                    <h2 id="audit-title">Rule output</h2>
+                  </div>
+                  <span>{snapshot.report.findings.length.toString().padStart(2, '0')} checks</span>
+                </header>
+
+                <div className="findings">
+                  {snapshot.report.findings.map((finding) => (
+                    <article className="finding" key={`${finding.rule}:${finding.reasonCode}`}>
+                      <div className="finding-rule">
+                        <code>{finding.rule}</code>
+                        <span
+                          className={`finding-status finding-status--${finding.status.toLowerCase()}`}
+                        >
+                          {finding.status}
+                        </span>
+                      </div>
+                      <div className="finding-copy">
+                        <strong>{finding.reasonCode}</strong>
+                        <p>{finding.message}</p>
+                      </div>
+                      <div className="source-refs">
+                        <span>Source refs</span>
+                        {finding.sourceRefs.length > 0 ? (
+                          finding.sourceRefs.map((sourceRef) => (
+                            <code key={sourceRef}>{sourceRef}</code>
+                          ))
+                        ) : (
+                          <code>internal:timeline</code>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="timeline" aria-labelledby="timeline-title">
+                <header className="section-heading section-heading--compact">
+                  <div>
+                    <p className="kicker">Correlation sequence</p>
+                    <h2 id="timeline-title">Evidence timeline</h2>
+                  </div>
+                  <span>HCS ordered</span>
+                </header>
+                <ol>
+                  {snapshot.timeline.map((event, index) => (
+                    <li key={event.eventId}>
+                      <span className="timeline-node">
+                        {(index + 1).toString().padStart(2, '0')}
+                      </span>
+                      <strong>{timelineLabels[event.type]}</strong>
+                      <code>{event.eventId}</code>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            </>
+          )}
+
+          {(slashResult !== null || killResult !== null) && (
+            <section className="banner banner--result" aria-live="polite">
+              {slashResult !== null && (
+                <p>
+                  Slash settled: stake {slashResult.stakeBefore} → {slashResult.stakeAfter} tinybar
+                  (<code>{slashResult.txHash}</code>)
+                </p>
+              )}
+              {killResult !== null && (
+                <p>
+                  Vault frozen: {killResult.vaultStateAfter.status} (
+                  <code>{killResult.killSwitch.txHash}</code>)
+                </p>
+              )}
+            </section>
+          )}
+
+          <footer>
+            <span>RECON / ETHONLINE 2026</span>
+            <span>Claimed vs actual vs allowed</span>
+          </footer>
+        </div>
+      </section>
     </main>
   );
 }

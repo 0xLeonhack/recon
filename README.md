@@ -5,7 +5,7 @@
 > Everyone is putting leashes on agents. RECON verifies the leash actually holds.
 > It reconciles **what the agent claimed to do**, **what it actually did**, and **what its mandate allowed** — and turns every mismatch into independently re-verifiable evidence.
 
-**ETHOnline 2026** · Bounties: Hedera (AI & Agentic Payments) · The Graph (AI Use Case) · Bazantic (Sponsor API Recipe)
+**ETHOnline 2026** · Bounties: Hedera (AI & Agentic Payments) · The Graph (AI Use Case) · Bazantic (Sponsor API Recipe — ⬜ planned, not implemented)
 
 ---
 
@@ -58,13 +58,13 @@ Public verifier core (same code as the agent used)
 
 **Payment flow (x402):** unpaid request → `402` + payment requirements (scheme `exact`, network `hedera:testnet`) → agent pays via Blocky402 facilitator → retries with payment header → facilitator verifies + settles → response carries the on-chain settlement reference. **Payment success ≠ verification pass** — a settled request still returns `MISMATCH` if the hashes don't agree.
 
-## Bounties — load-bearing, not stickers
+## Bounties — implemented, not stickers
 
-| Track | What RECON actually does with it |
+| Track | Status and what RECON does with it |
 |---|---|
 | **Hedera** | x402-gated verify-query API settled via Blocky402 on Hedera testnet; HBAR `PolicyVault` with owner/agent/verifier separation; HCS evidence timeline auditable from the mirror node |
 | **The Graph** | Live Graph data drives the agent decision *and* is replayed at a pinned block as R1 evidence — same query, same canonicalization, same hash |
-| **Bazantic** | Recipe chains The Graph + the RECON verify-query API; the final vault action depends on both outputs |
+| **Bazantic** ⬜ planned | **Not implemented** — this repository contains no Gateway or Recipe, and no claim is made for this track. If built, the Recipe would chain The Graph + the RECON verify-query API so the final vault action depends on both outputs. |
 
 ## Trust boundary (read this before trusting the demo)
 

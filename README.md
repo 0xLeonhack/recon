@@ -39,24 +39,97 @@ Five rules, one shared pure-TypeScript core (no network, no env, no wallet):
 | **R4** | HCS sequence order + correlation state machine | reordered / broken timeline → `MISMATCH` |
 | **R5** | Payment claim vs settlement receipt (asset, amount, service, ref) | inflated payment → `MISMATCH` |
 
-External service down → `UNVERIFIABLE`. Never silently treated as pass **or** cheat.
+An external service being down yields `UNVERIFIABLE` — never silently treated as a pass **or** a cheat.
 
 ## Architecture
 
-```
-Agent (restricted signer — no owner keys)
-  ├─ The Graph live query ──── pinned deployment + final block evidence
-  ├─ x402 paidVerify ───────── RECON verify-query API · Blocky402 settlement on Hedera
-  ├─ DeepSeek tool choice ──── bounded EXECUTE_VAULT / STOP + rationale
-  ├─ execute ──────────────── PolicyVault (HBAR, budget cap, allowlist, deadline, stake)
-  └─ publishEvidence ──────── HCS topic (one correlationId end-to-end)
+RECON is layered so that **the part that decides truth has no I/O**, and **the parts that touch the outside world are isolated behind narrow adapters**. The agent and any independent third party run the *same* reconciliation core over the same evidence — the verdict is a pure function of the inputs, not of who is asking.
 
-Public verifier core (same code as the agent used)
-  ├─ Hedera mirror node · The Graph gateway · payment receipts
-  └─ CLI + React panel: Claimed / Actual / Allowed
+### Layers and the dependency rule
+
+```
+   Presentation    ┌─────────────────────────────────────────────────────────────────┐
+                   │  web/  (React panel)       scripts/  (CLI)                      │
+                   └───────────────────────────────┬─────────────────────────────────┘
+                                                   │ LiveSnapshot · JSON report
+   Application     ┌───────────────────────────────▼─────────────────────────────────┐
+                   │  src/api   verify-query (x402) · demo ctrl                      │
+                   │  src/demo  run loop · live verifier · slash                     │
+                   └───────────────────────────────┬─────────────────────────────────┘
+                                                   │
+   Domain (pure)   ┌───────────────────────────────▼─────────────────────────────────┐
+                   │  src/core   evidence · R1–R5 · status                           │
+                   │  src/agent  deterministic policy + tool guard                   │
+                   └───────────────────────────────┬─────────────────────────────────┘
+                                                   │ the ONLY I/O boundary
+   Adapters (I/O)  ┌───────────────────────────────▼─────────────────────────────────┐
+                   │  thegraph · hcs · blocky402 · hedera · deepseek                 │
+                   └───────────────────────────────┬─────────────────────────────────┘
+                                                   │
+   On-chain        ┌───────────────────────────────▼─────────────────────────────────┐
+                   │  PolicyVault.sol — mandate · stake · slash ·                    │
+                   │  freeze              HCS topic — evidence                       │
+                   └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Payment flow (x402):** unpaid request → `402` + payment requirements (scheme `exact`, network `hedera:testnet`) → agent pays via Blocky402 facilitator → retries with payment header → facilitator verifies + settles → response carries the on-chain settlement reference. **Payment success ≠ verification pass** — a settled request still returns `MISMATCH` if the hashes don't agree.
+**The dependency rule is load-bearing:** `src/core` imports nothing from adapters and performs no network, env, or wallet access. Every rule below is a pure `(evidence) → finding` function, which is exactly why a third party can re-run it and expect the same result. `src/adapters/*` are the only modules allowed to reach the network, and each hides one external system behind a typed boundary.
+
+### Module map
+
+| Module | Responsibility | External I/O |
+|---|---|---|
+| `src/core` | Evidence schema, canonical JSON (`recon-json-v1`), SHA-256 hashing, rules R1–R5, status aggregation, report assembly | **none** |
+| `src/agent` | Deterministic liquidity policy (`EXECUTE`/`HOLD`) and a guard that rejects an LLM tool choice mismatching the policy or payment status | **none** |
+| `src/api` | x402 `verify-query` handler (402 challenge → verify → settle → respond) and the demo HTTP controller that also serves the built frontend | HTTP |
+| `src/demo` | Live run loop, the independent live verifier, slash and kill operations, env-backed config | via adapters |
+| `src/adapters/thegraph` | Pinned-block double replay; re-derives the canonical response hash | The Graph gateway |
+| `src/adapters/hcs` | Publishes and reads `EvidenceEvent`s | Hedera SDK · mirror node |
+| `src/adapters/blocky402` | x402 payment verification + settlement via facilitator | HTTP |
+| `src/adapters/hedera` | Vault read/write, log scan, payment receipts | JSON-RPC relay · mirror node |
+| `src/adapters/deepseek` | Bounded `EXECUTE_VAULT`/`STOP` tool choice with hashed prompt/input/output | DeepSeek API |
+| `web` | Renders the shared `LiveSnapshot`; implements no rules of its own | browser |
+| `contracts` | `PolicyVault` — the on-chain mandate | Hedera |
+
+### Core data model: one correlation, five evidence events
+
+A run is a chain of immutable evidence events sharing a single `correlationId`. Each event is validated with zod (`schemaVersion`, `eventId`, `type`, `actor`, `subjectRef`, `payloadHash`, and a string-keyed `evidence` record) and published to HCS, which supplies content integrity and consensus order:
+
+```
+DATA_QUERY → API_PAYMENT → RATIONALE → ACTION_PROPOSED → ACTION_EXECUTED
+```
+
+Hashing is deterministic end to end: any JSON value is canonicalized with sorted keys and no whitespace (`recon-json-v1`), then hashed with SHA-256 — so "the same data" has exactly one hash regardless of key order or formatting.
+
+### The verification pipeline
+
+`src/demo/verify.ts` assembles the evidence and feeds it to the pure core:
+
+1. **Gather** — read the HCS topic from the mirror node, filter to the correlation, read vault state and `ActionExecuted`/`ActionRejected` logs from the RPC relay, and fetch the payment receipt.
+2. **Replay** — R1 re-runs the pinned Graph query independently (see below).
+3. **Judge** — R1–R5 each return a `VerificationFinding` (`{ rule, status, reasonCode, message, sourceRefs }`).
+4. **Aggregate** — `createVerificationReport` folds findings by severity `VERIFIED < PENDING < UNVERIFIABLE < REJECTED < MISMATCH`. One `MISMATCH` anywhere makes the whole report `MISMATCH`.
+
+Crucially, R1 does not trust the agent's recorded hash. `src/adapters/thegraph/replay.ts` first verifies the *target* (`_meta` deployment matches, block matches, no indexing errors), then runs the data query **twice** and hashes both responses — a self-consistency check on the replay itself — and R1 compares that independently derived hash against the hash the agent claimed. External services being unavailable yields `UNVERIFIABLE`, never a silent pass or a false cheat.
+
+### On-chain mandate: what "Allowed" actually enforces
+
+`PolicyVault.sol` is the source of truth for the third column. Its constructor requires five **distinct, non-zero** roles — `owner`, `agent`, `agentOperator`, `verifier`, `slashBeneficiary` — so the key that spends (agent), the key that is punished (operator), and the key that judges (verifier) can never be the same account. `execute` re-checks the mandate on chain, before any transfer: amount non-zero, `Active`, within `deadline`, recipient allow-listed, within `budgetCap − spent`, and covered by `principalBalance`. A rejection is an `ActionRejected` event (not a revert), which the verifier treats as a non-execution. Stake is isolated from principal, `slash` is `onlyVerifier`, and `kill`/`close` are `onlyOwner` — the on-chain half of the trust model.
+
+### One run, end to end
+
+```
+Graph query ──► x402 paid verify ──► DeepSeek choice ──► vault execute ──► 5 HCS events
+     │                  │                   │                  │                 │
+pinned block     402→pay→settle       policy guard      mandate checks     correlationId
+```
+
+1. **Query** — the agent queries the pinned Graph deployment; the response hash becomes R1's claim.
+2. **Pay** — it calls the x402-gated `verify-query` service: unpaid → `402` with requirements → pays through the Blocky402 facilitator → retries with the payment header → gets the result plus the on-chain settlement reference.
+3. **Decide** — a deterministic policy reads the same Graph data, and the DeepSeek model picks a bounded tool; the guard (`assertToolMatchesPolicy`) rejects any choice that disagrees with the policy or a non-`VERIFIED` payment.
+4. **Execute** — the agent signs `PolicyVault.execute` with its restricted key; the mandate is enforced on chain.
+5. **Publish** — all five events go to the HCS topic under one `correlationId`, ready for anyone to replay.
+
+**Payment flow (x402):** unpaid request → `402` + payment requirements (scheme `exact`, network `hedera:testnet`) → agent pays via Blocky402 facilitator → retries with payment header → facilitator verifies + settles → response carries the on-chain settlement reference. Payment headers are single-use, and settled responses are memoized so a replayed header returns the original result. **Payment success ≠ verification pass** — a settled request still returns `MISMATCH` if the hashes don't agree.
 
 ## Bounties — implemented, not stickers
 
@@ -80,7 +153,7 @@ Node.js ≥ 22.13.
 
 ```bash
 npm ci
-npm run check        # format + lint + typecheck + 144 unit tests + contract compile + web build
+npm run check           # format + lint + typecheck + 144 unit tests + contract compile + web build
 npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, slash, kill-switch
 ```
 
@@ -88,15 +161,15 @@ npm run test:contracts  # 7 Solidity tests: mandate, roles, stake isolation, sla
 
 | Group | How to obtain |
 |---|---|
-| Hedera accounts (`HEDERA_OPERATOR_ID`, `HEDERA_PRIVATE_KEY`, agent/verifier/operator keys + addresses) | Create free testnet accounts at [portal.hedera.com](https://portal.hedera.com). The portal faucet is limited per user; additional ECDSA accounts can be created on-chain from the owner account with `scripts/create-accounts.ts`. Top up anytime via the web faucet (100 testnet HBAR per claim). Use **ECDSA** keys; each vault role must be a **distinct** account. |
+| Hedera accounts + keys (`HEDERA_*`) | Free testnet accounts at [portal.hedera.com](https://portal.hedera.com); top up any time via the web faucet (100 HBAR per claim). Use **ECDSA** keys and a **distinct** account per vault role — `scripts/create-accounts.ts` creates extras on-chain from the owner account. |
 | `HEDERA_TOPIC_ID`, `VAULT_ADDRESS` | Produced by `npm run topic:create` and `npm run vault:deploy` — paste both outputs back into `.env`. |
-| `GRAPH_API_KEY`, `GRAPH_DEPLOYMENT_ID`, `GRAPH_FINAL_BLOCK_NUMBER` | API key from [thegraph.com](https://thegraph.com) dashboard; deployment ID of the subgraph to pin (we verified against the official Uniswap V3 deployment); a block number already indexed by that deployment. |
-| `DEEPSEEK_API_KEY` | Server-side DeepSeek API key. The bounded selector uses `deepseek-v4-flash`; the key and raw authorization header never enter HCS or the browser. |
-| `X402_VERIFY_PAYTO`, `X402_VERIFY_PRICE_TINYBAR` | Your EVM address receiving API payments; price in tinybar (default `10000000` = 0.1 HBAR). |
+| `GRAPH_API_KEY`, `GRAPH_DEPLOYMENT_ID`, `GRAPH_FINAL_BLOCK_NUMBER` | API key from [thegraph.com](https://thegraph.com); the deployment to pin (we verified against the official Uniswap V3 deployment) and a block it has already indexed. |
+| `DEEPSEEK_API_KEY` | Server-side only; the key and raw authorization header never enter HCS or the browser. |
+| `X402_VERIFY_PAYTO`, `X402_VERIFY_PRICE_TINYBAR` | Address receiving API payments; price in tinybar (default `10000000` = 0.1 HBAR). |
 
-> **Note:** the live demo scripts (`api:start`, `pay:header`, `run:live`, `verify:live`, `slash:forged`, `kill:switch`, `demo:start`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. `verify:live` starts its vault log scan at the vault's deploy block (resolved from the mirror node, or `VAULT_DEPLOY_BLOCK` if set) — the public relay rejects any wider `eth_getLogs` span. The demo assumes values in Hedera's relay semantics: `msg.value`-style amounts (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar; calldata-style amounts (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
+The live demo scripts (`api:start`, `pay:header`, `run:live`, `verify:live`, `slash:forged`, `kill:switch`, `demo:start`) auto-load `.env`; other scripts need it loaded first: `set -a; source .env; set +a`. Amount gotcha: `msg.value`-style vars (`FUND_AMOUNT_TINYBAR`, `STAKE_AMOUNT_TINYBAR`) are 18-decimal weibar, calldata-style vars (`VAULT_BUDGET_CAP_TINYBAR`, `VAULT_AMOUNT_TINYBAR`, `SLASH_AMOUNT_TINYBAR`) are tinybar (`1 HBAR = 10^8 tinybar = 10^18 weibar`).
 
-Verify a correlation end-to-end (reconciliation core, deterministic):
+Verify a correlation end-to-end (reconciliation core, deterministic — no credentials needed):
 
 ```bash
 npm run demo:verify            # → report.status: VERIFIED   (exit 0)
@@ -111,24 +184,6 @@ npm run probe:hedera   # Hedera testnet RPC readiness                  → chain
 npm run probe:graph    # double-replay at pinned block (needs GRAPH_API_KEY + deployment id)
 ```
 
-### Live web control layer
-
-The browser demo drives the same live loop through one backend process (no browser wallet — slash and freeze are signed server-side with the `.env` keys):
-
-The single-page site introduces the protocol, its claimed / actual / allowed model, evidence flow, and load-bearing integrations before the in-page **Live demo** anchor opens the operational console.
-
-```bash
-npm run web:build && npm run demo:start   # → http://127.0.0.1:4021
-```
-
-- `GET /api/mandate` renders the live vault state (status, budget cap, deadline, spent, balances, recipient allowlist).
-- **Normal run** / **Forged hash** trigger a real run — Graph → x402 payment → DeepSeek rationale → vault execute → 5 HCS events — then show the R1–R5 report.
-- **Live progress** — while a run is in flight the UI polls `/api/run/progress` and renders a six-step stage track (Graph query → Payment → Rationale → Vault execute → Evidence → Verify).
-- **Slash stake** (enabled only when the report is `MISMATCH`) submits the verifier-mediated slash.
-- **Freeze vault** flips the kill switch; the next agent action is rejected `NotActive`.
-
-The frontend implements no rules of its own — it renders the same `LiveSnapshot` the CLI verifier produces (Web and CLI share one verification core).
-
 ### Live end-to-end on Hedera testnet
 
 All of the below run against real services — real HCS messages, real vault transactions, a real 402 payment. Nothing falls back to mocks; a missing credential aborts with `UNVERIFIABLE`.
@@ -142,7 +197,19 @@ npm run slash:forged  # forged correlation → verifier submits slash(evidenceHa
 npm run kill:switch   # owner freezes the vault → further agent actions rejected with NotActive
 ```
 
-`run:live` and the web control layer generate the x402 payment header in memory (the same single code path), so neither needs a separate `api:start` process or an `X402_PAYMENT_HEADER` round-trip.
+### Live web control layer
+
+```bash
+npm run web:build && npm run demo:start   # → http://127.0.0.1:4021
+```
+
+One backend process drives the same live loop — no browser wallet, since slash and freeze are signed server-side with the `.env` keys. The single-page site introduces the protocol and its claimed / actual / allowed model, then opens the console:
+
+- **Normal run** / **Forged hash** trigger a real run (Graph → x402 payment → DeepSeek rationale → vault execute → 5 HCS events) and show the R1–R5 report, with a six-step live progress track.
+- **Slash stake** (enabled only when the report is `MISMATCH`) submits the verifier-mediated slash; **Freeze vault** flips the kill switch, so the next agent action is rejected `NotActive`.
+- `GET /api/mandate` renders the live vault state (status, budget cap, deadline, spent, balances, recipient allowlist).
+
+The frontend implements no rules of its own — it renders the same `LiveSnapshot` the CLI verifier produces.
 
 ## Deployed on Hedera testnet
 
@@ -158,39 +225,13 @@ Live instance used by the demo (all values public — no keys in this repository
 | Pinned Graph target | official Uniswap V3 deployment `QmTZ8ejXJxRo7vDBS4uwqBeGoxLSWbhaA7oXa1RvxunLy7`, Ethereum mainnet block `25946145`; double-replay hash `0x41f0335a…4f2f71e72` (matched twice) |
 | Latest fully verified run | correlation `live-1789126008352`; R1-R5 `VERIFIED`; vault tx [`0xf1b7e011…b10edc8`](https://hashscan.io/testnet/transaction/0xf1b7e0110c51cd6a82cce56a3c9baa6716c8bc547d11ff4490cb3aaf9b10edc8); settlement [`0.0.7162784@1789126003.965804578`](https://hashscan.io/testnet/transaction/0.0.7162784-1789126003-965804578) |
 
-## Status — what is proven vs in progress
+Everything above is exercised live, not mocked: the reconciliation core (144 unit tests) and `PolicyVault` (7 contract tests) are run end to end by a real `run:live` — Graph double-replay, Blocky402 facilitator + 402 contract (`hedera:testnet`, x402 v2), Hedera RPC (chain 296), a real x402 payment, and a real `deepseek-v4-flash` bounded decision — then independently replayed by the live verifier to `VERIFIED`. Per-evidence tracking: [`docs/ROADMAP.md`](docs/ROADMAP.md). Bazantic Recipe wiring and the demo video remain ⬜ planned.
 
-No mock is presented as live evidence. Per-evidence tracking: [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-| Component | State |
-|---|---|
-| Reconciliation core R1–R5, canonicalization, SHA-256 hashing | ✅ implemented, 144 unit tests |
-| `PolicyVault` (HBAR mandate, stake isolation, slash, kill-switch) | ✅ 7 contract tests; **deployed & funded on testnet** (see above) |
-| HCS evidence timeline | ✅ topic live; publish path exercised by `run:live` |
-| Blocky402 facilitator discovery + 402 contract | ✅ verified live (`hedera:testnet`, x402 v2) |
-| Hedera testnet RPC | ✅ verified live (chain ID 296) |
-| The Graph double-replay | ✅ verified live against the official Uniswap V3 deployment; pinned `_meta.block.hash` is honestly recorded as null when the gateway prunes historical hashes |
-| Real x402 payment loop, live end-to-end run | ✅ verified live end-to-end (`run:live`: Graph query → 402 payment → vault execute → HCS) |
-| Live verifier R1-R5 | ✅ correlation `live-1789126008352` independently replayed from Graph, HCS, Vault and Hedera payment receipt; all five rules `VERIFIED` |
-| DeepSeek V4 Flash decision | ✅ verified live — real `deepseek-v4-flash` produced the bounded EXECUTE_VAULT/STOP choice; recorded in the timeline and gated by the deterministic liquidity policy |
-| Bazantic Recipe wiring, video | ⬜ planned |
+Full docs: [`docs/prd.md`](docs/prd.md) (product & acceptance) · [`docs/ROADMAP.md`](docs/ROADMAP.md) (build order & evidence) · [`docs/project-brief.md`](docs/project-brief.md) (external narrative).
 
 ## Stack
 
 Solidity 0.8.34 · Hardhat 3 + viem (Hedera testnet, JSON-RPC Relay) · TypeScript strict (`src/core` never touches network, env, or wallets) · Vite + React 19 · zod · Vitest.
-
-## Repository
-
-```
-contracts/   PolicyVault.sol · HtsTransferProbe.sol
-src/core/    types · canonicalization · hashing · R1-R5 reconciliation (pure)
-src/adapters/ thegraph · blocky402 · hcs   (narrow network boundaries)
-src/agent/   deterministic tool workflow     src/verifier/  report assembly
-src/api/     x402 verify-query service       web/           React panel
-scripts/     probes · deployment · live demo · slashing   docs/  PRD · roadmap · track guides
-```
-
-Full docs: [`docs/prd.md`](docs/prd.md) (product & acceptance) · [`docs/ROADMAP.md`](docs/ROADMAP.md) (build order & evidence) · [`docs/project-brief.md`](docs/project-brief.md) (external narrative).
 
 ## AI usage disclosure
 

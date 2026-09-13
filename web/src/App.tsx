@@ -17,13 +17,27 @@ import {
   type SlashResult,
 } from './api';
 
+const HASHSCAN_BASE_URL = 'https://hashscan.io/testnet';
+
+function hashscanTransactionUrl(ref: string): string | null {
+  if (ref.length === 0 || ref === 'missing') return null;
+  if (/^0x[0-9a-fA-F]{64}$/.test(ref)) {
+    return `${HASHSCAN_BASE_URL}/transaction/${ref}`;
+  }
+  const mirror = /^(\d+\.\d+\.\d+)@(\d+)\.(\d{1,9})$/.exec(ref);
+  if (mirror === null) return null;
+  const nanos = (mirror[3] ?? '').padStart(9, '0');
+  return `${HASHSCAN_BASE_URL}/transaction/${mirror[1]}-${mirror[2]}-${nanos}`;
+}
+
 interface EvidenceRowProps {
   readonly label: string;
   readonly value: string;
   readonly tone?: 'default' | 'positive' | 'negative';
+  readonly href?: string | null;
 }
 
-function EvidenceRow({ label, value, tone = 'default' }: EvidenceRowProps) {
+function EvidenceRow({ label, value, tone = 'default', href = null }: EvidenceRowProps) {
   return (
     <div className="evidence-row">
       <dt>{label}</dt>
@@ -37,7 +51,13 @@ function EvidenceRow({ label, value, tone = 'default' }: EvidenceRowProps) {
         }
         title={value}
       >
-        {value}
+        {href === null ? (
+          value
+        ) : (
+          <a className="evidence-link" href={href} target="_blank" rel="noreferrer">
+            {value}
+          </a>
+        )}
       </dd>
     </div>
   );
@@ -559,7 +579,18 @@ export function App() {
                       label="Amount"
                       value={`${snapshot.actual.amountTinybar} tinybar`}
                     />
-                    <EvidenceRow label="Transaction" value={snapshot.actual.transactionRef} />
+                    <EvidenceRow
+                      label="Transaction"
+                      value={snapshot.actual.transactionRef}
+                      href={hashscanTransactionUrl(snapshot.actual.transactionRef)}
+                    />
+                    {snapshot.settlementRef !== undefined && (
+                      <EvidenceRow
+                        label="Settlement"
+                        value={snapshot.settlementRef}
+                        href={hashscanTransactionUrl(snapshot.settlementRef)}
+                      />
+                    )}
                   </dl>
                 </article>
 
@@ -632,7 +663,14 @@ export function App() {
                     <p className="kicker">Correlation sequence</p>
                     <h2 id="timeline-title">Evidence timeline</h2>
                   </div>
-                  <span>HCS ordered</span>
+                  <a
+                    className="hashscan-link"
+                    href={`${HASHSCAN_BASE_URL}/topic/${snapshot.topicId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    HCS topic ↗
+                  </a>
                 </header>
                 <ol>
                   {snapshot.timeline.map((event, index) => (

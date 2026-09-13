@@ -82,6 +82,7 @@ export interface LiveSnapshot {
   readonly report: VerificationReport;
   readonly vault: VaultState;
   readonly settlementRef?: string;
+  readonly topicId: string;
   readonly quarantinedMessages: number;
 }
 

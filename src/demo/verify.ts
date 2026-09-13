@@ -50,6 +50,7 @@ export interface LiveSnapshot {
   readonly report: VerificationReport;
   readonly vault: VaultState;
   readonly settlementRef?: string;
+  readonly topicId: string;
   readonly quarantinedMessages: number;
 }
 
@@ -361,6 +362,7 @@ export async function verifyLive(config: DemoConfig, correlationId: string): Pro
     report: createVerificationReport(correlationId, findings),
     vault: vaultState,
     settlementRef: paymentEvent?.evidence.settlementRef,
+    topicId: config.topicId,
     quarantinedMessages: topicRead.invalid.length,
   };
 }

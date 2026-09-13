@@ -1149,6 +1149,30 @@ h1 {
   text-transform: uppercase;
 }
 
+.section-heading > .hashscan-link {
+  color: var(--signal-dark);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+
+.section-heading > .hashscan-link:hover {
+  color: var(--ink);
+}
+
+.evidence-link {
+  color: var(--signal-dark);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+
+.evidence-link:hover {
+  color: var(--ink);
+}
+
 .finding {
   display: grid;
   grid-template-columns: 185px minmax(220px, 1fr) minmax(220px, 0.9fr);

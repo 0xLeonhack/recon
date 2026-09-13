@@ -344,6 +344,9 @@ async function handleApi(
     sendJson(response, 404, { error: 'not_found' });
   } catch (error) {
     const mapped = errorResponse(error);
+    // The HTTP body stays a short machine code; the real cause (e.g. the HCS
+    // node's status) only appears here in the server log.
+    console.error(`[demo] ${request.method} ${pathname} -> ${mapped.status}`, error);
     sendJson(response, mapped.status, mapped.body);
   }
 }

@@ -89,8 +89,10 @@ describe('publishEvidenceEvent', () => {
       .fn<(message: Uint8Array) => Promise<{ sequenceNumber: number; transactionId: string }>>()
       .mockRejectedValue(new Error('network down'));
 
+    // The upstream reason must survive: the bare code cannot tell a rejected
+    // topic apart from a transient node error.
     await expect(publishEvidenceEvent('0.0.4929', evidenceEvent(6), submit)).rejects.toEqual(
-      new HcsPublishError('SUBMIT_FAILED'),
+      new HcsPublishError('SUBMIT_FAILED', 'Error: network down'),
     );
   });
 });

@@ -15,8 +15,11 @@ export interface EvidenceSubmitResult {
 export type HcsSubmitTransport = (message: Uint8Array) => Promise<EvidenceSubmitResult>;
 
 export class HcsPublishError extends Error {
-  constructor(readonly code: 'INVALID_TOPIC_ID' | 'INVALID_EVENT' | 'SUBMIT_FAILED') {
-    super(`HCS publish failed (${code})`);
+  constructor(
+    readonly code: 'INVALID_TOPIC_ID' | 'INVALID_EVENT' | 'SUBMIT_FAILED',
+    readonly detail?: string,
+  ) {
+    super(`HCS publish failed (${code})${detail === undefined ? '' : `: ${detail}`}`);
     this.name = 'HcsPublishError';
   }
 }
@@ -49,7 +52,12 @@ export async function publishEvidenceEvent(
     return await submit(encodeEvidenceEvent(validated));
   } catch (error) {
     if (error instanceof HcsPublishError) throw error;
-    throw new HcsPublishError('SUBMIT_FAILED');
+    // Keep the upstream reason visible: "SUBMIT_FAILED" alone cannot tell a
+    // rejected topic apart from a transient node error.
+    throw new HcsPublishError(
+      'SUBMIT_FAILED',
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    );
   }
 }
 

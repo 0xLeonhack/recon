@@ -40,6 +40,9 @@ export const RUN_STAGES = [
 
 export type RunStage = (typeof RUN_STAGES)[number];
 
+/** A completed run publishes five correlated evidence events to HCS. */
+const RUN_TIMELINE_EVENTS = 5;
+
 export interface RunProgress {
   readonly stage: RunStage;
 }
@@ -91,14 +94,22 @@ export function createDemoActions(config: DemoConfig): DemoActions {
         },
       });
       currentProgress = { stage: 'VERIFYING' };
-      // The mirror node needs a few seconds to index the fresh HCS messages.
-      const deadline = Date.now() + 30_000;
+      // The mirror node indexes the fresh HCS messages a few at a time, so the
+      // first successful read can still be a partial timeline. Keep polling until
+      // the whole correlation is readable, otherwise the panel renders a report
+      // whose R3/R4 are PENDING and whose vault transaction is "missing".
+      const deadline = Date.now() + 60_000;
       let lastError: LiveVerifyError | undefined;
+      let lastSnapshot: LiveSnapshot | undefined;
       while (Date.now() < deadline) {
         try {
           const snapshot = await verifyLive(config, correlationId);
-          currentProgress = null;
-          return snapshot;
+          if (snapshot.timeline.length >= RUN_TIMELINE_EVENTS) {
+            currentProgress = null;
+            return snapshot;
+          }
+          lastSnapshot = snapshot;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
         } catch (error) {
           if (
             error instanceof LiveVerifyError &&
@@ -110,6 +121,10 @@ export function createDemoActions(config: DemoConfig): DemoActions {
           }
           throw error;
         }
+      }
+      if (lastSnapshot !== undefined) {
+        currentProgress = null;
+        return lastSnapshot;
       }
       throw lastError ?? new LiveVerifyError('VERIFICATION_TIMEOUT');
     },
